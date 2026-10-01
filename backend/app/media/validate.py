@@ -40,8 +40,14 @@ def validate_image(data: bytes) -> tuple[str, int, int]:
         w = h = 0
         if len(data) >= 33:
             w, h = struct.unpack(">II", data[16:24])
+        # Structural check: truncated PNGs hang decoders (image -loop retries
+        # forever). Require at least one IDAT chunk and the IEND trailer.
+        if b"IDAT" not in data or b"IEND\xae\x42\x60\x82" not in data[-12:]:
+            raise MediaInvalid("truncated png (missing IDAT/IEND)")
         return "image/png", w, h
     if data[:2] == b"\xff\xd8":
+        if not data.rstrip().endswith(b"\xff\xd9"):
+            raise MediaInvalid("truncated jpeg (missing EOI)")
         return "image/jpeg", 0, 0
     if data[:4] == b"RIFF" and data[8:12] == b"WEBP":
         return "image/webp", 0, 0

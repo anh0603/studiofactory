@@ -27,20 +27,15 @@ from app.db.base import Base  # noqa: E402
 from app.db.session import get_db  # noqa: E402
 import app.engine.runner as R  # noqa: E402
 from app.main import create_app  # noqa: E402
+from helpers import data_url, valid_png_bytes, valid_wav_bytes  # noqa: E402
 
 
 def png_b64():
-    raw = (b"\x89PNG\r\n\x1a\n" + struct.pack(">I", 13) + b"IHDR" +
-           struct.pack(">IIBBBBB", 8, 6, 8, 2, 0, 0, 0) + struct.pack(">I", 0))
-    return "data:image/png;base64," + base64.b64encode(raw).decode()
+    return data_url("image/png", valid_png_bytes())
 
 
 def wav_b64():
-    n = 8000
-    raw = (b"RIFF" + struct.pack("<I", 36 + n) + b"WAVE" + b"fmt " +
-           struct.pack("<IHHIIHH", 16, 1, 1, 8000, 8000, 1, 8) + b"data" +
-           struct.pack("<I", n) + b"\x00" * n)
-    return "data:audio/wav;base64," + base64.b64encode(raw).decode()
+    return data_url("audio/wav", valid_wav_bytes())
 
 
 PLAN = {"title": "The Brave Cat", "concept": "c", "hook": "h", "audience": "kids",
@@ -97,6 +92,8 @@ def setup_ai(client):
 
 
 def test_story_e2e_honest_no_ffmpeg(tmp_path, monkeypatch):
+    import shutil as _sh
+    HAS_FFMPEG = _sh.which("ffmpeg") is not None
     client = make_client(tmp_path, monkeypatch)
     setup_ai(client)
     # 1. Project + character + director + approve.
@@ -129,24 +126,67 @@ def test_story_e2e_honest_no_ffmpeg(tmp_path, monkeypatch):
         "idempotency_key": "e2e-1"}).json()["data"]
     summary = R.run_job(job["id"])
     detail = client.get(f"/api/v1/jobs/{job['id']}").json()["data"]
-    assert summary["status"] == "FAILED"
-    compose = next(n for n in detail["nodes"] if n["type"] == "COMPOSE")
-    assert compose["error_code"] == "FFMPEG_UNAVAILABLE"
+    if HAS_FFMPEG:
+        # Real render path: everything succeeds, QC REVIEW (character
+        # Milo is REVIEW_REQUIRED, honestly not verified), gate PASS.
+        assert summary["status"] == "SUCCEEDED"
+        compose = next(n for n in detail["nodes"] if n["type"] == "COMPOSE")
+        assert compose["status"] == "SUCCEEDED"
+        qc = client.post(f"/api/v1/projects/{prj['id']}/qc",
+                         json={"disclosure": True}).json()["data"]
+        assert qc["qc"]["verdict"] == "REVIEW_REQUIRED"
+        assert qc["gate"]["decision"] == "PASS"
+        exp = client.post(f"/api/v1/projects/{prj['id']}/export",
+                          json={"disclosure_text": "AI-generated."})
+        assert exp.status_code == 200, exp.text
+        manifest = exp.json()["data"]["manifest"]
+        assert manifest["files"].get("VIDEO", "").endswith("final.mp4")
+        # Real MP4 on disk: verify with ffprobe (streams, duration, size).
+        import json as _json
+        import subprocess as _sp
+        from pathlib import Path as _P
+        mp4 = next((_P(str(tmp_path / "p")) / prj["id"] / v
+                    for v in [manifest["files"]["VIDEO"]]), None)
+        assert mp4 is not None and mp4.exists() and mp4.stat().st_size > 1000
+        probe = _sp.run(["ffprobe", "-v", "quiet", "-print_format", "json",
+                         "-show_format", "-show_streams", str(mp4)],
+                        capture_output=True, text=True, timeout=60)
+        info = _json.loads(probe.stdout)
+        kinds = {s["codec_type"] for s in info["streams"]}
+        assert {"video", "audio"} <= kinds
+        assert float(info["format"]["duration"]) > 0
+        vstream = next(s for s in info["streams"] if s["codec_type"] == "video")
+        assert (vstream["width"], vstream["height"]) == (720, 1280)
+    else:
+        assert summary["status"] == "FAILED"
+        compose = next(n for n in detail["nodes"] if n["type"] == "COMPOSE")
+        assert compose["error_code"] == "FFMPEG_UNAVAILABLE"
     assert detail["progress_percent"] is None  # never fabricated
-    # 4. QC BLOCKED -> export BLOCKED -> publish BLOCKED. No fake success anywhere.
-    qc = client.post(f"/api/v1/projects/{prj['id']}/qc",
-                     json={"disclosure": True}).json()["data"]
-    assert qc["qc"]["verdict"] == "BLOCKED"
-    exp = client.post(f"/api/v1/projects/{prj['id']}/export",
-                      json={"disclosure_text": "AI-generated."})
-    assert exp.status_code == 422 and exp.json()["error"]["code"] == "PRODUCTION_BLOCKED"
-    pub = client.post("/api/v1/publisher/publish", json={
-        "job_id": job["id"], "platforms": ["youtube"], "idempotency_key": "e2e-pub"})
-    assert pub.status_code == 422
-    # 5. Analytics reflects reality: 1 failed job, 0 published.
-    analytics = client.get("/api/v1/analytics/overview").json()["data"]
-    assert analytics["production"]["jobs_failed"] == 1
-    assert analytics["publishing"]["confirmed"] == 0
+    if HAS_FFMPEG:
+        # 4b. Gate passed already; publish still refused without connection.
+        pub = client.post("/api/v1/publisher/publish", json={
+            "job_id": job["id"], "platforms": ["youtube"], "idempotency_key": "e2e-pub"})
+        assert pub.status_code == 409
+        assert pub.json()["error"]["code"] == "PUBLISH_CONFIG_REQUIRED"
+        analytics = client.get("/api/v1/analytics/overview").json()["data"]
+        assert analytics["production"]["jobs_failed"] == 0
+        assert analytics["production"]["exports"] == 1
+        assert analytics["publishing"]["confirmed"] == 0
+    else:
+        # 4. QC BLOCKED -> export BLOCKED -> publish BLOCKED. No fake success.
+        qc = client.post(f"/api/v1/projects/{prj['id']}/qc",
+                         json={"disclosure": True}).json()["data"]
+        assert qc["qc"]["verdict"] == "BLOCKED"
+        exp = client.post(f"/api/v1/projects/{prj['id']}/export",
+                          json={"disclosure_text": "AI-generated."})
+        assert exp.status_code == 422 and exp.json()["error"]["code"] == "PRODUCTION_BLOCKED"
+        pub = client.post("/api/v1/publisher/publish", json={
+            "job_id": job["id"], "platforms": ["youtube"], "idempotency_key": "e2e-pub"})
+        assert pub.status_code == 422
+        # 5. Analytics reflects reality: 1 failed job, 0 published.
+        analytics = client.get("/api/v1/analytics/overview").json()["data"]
+        assert analytics["production"]["jobs_failed"] == 1
+        assert analytics["publishing"]["confirmed"] == 0
     assert "sk-e2e" not in (client.get("/api/v1/ai/activity").text
                             + client.get(f"/api/v1/jobs/{job['id']}").text)
 

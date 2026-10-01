@@ -23,28 +23,11 @@ from app.db import models as M  # noqa: E402
 from app.db.session import get_db  # noqa: E402
 from app.main import create_app  # noqa: E402
 from app.media import ffmpeg as ff  # noqa: E402
-
-
-def png_bytes(w=8, h=6):
-    return (b"\x89PNG\r\n\x1a\n" + struct.pack(">I", 13) + b"IHDR" +
-            struct.pack(">IIBBBBB", w, h, 8, 2, 0, 0, 0) + struct.pack(">I", 0))
-
-
-def wav_bytes(duration_s=2.0, rate=8000):
-    n = int(duration_s * rate)
-    data = b"\x00" * n
-    header = (b"RIFF" + struct.pack("<I", 36 + n) + b"WAVE" + b"fmt " +
-              struct.pack("<IHHIIHH", 16, 1, 1, rate, rate, 1, 8) + b"data" +
-              struct.pack("<I", n))
-    return header + data
+from helpers import data_url, valid_png_bytes as png_bytes, valid_wav_bytes as wav_bytes  # noqa: E402
 
 
 def mp4_bytes():
     return b"\x00\x00\x00\x18ftypisom" + b"\x00" * 2048
-
-
-def data_url(mime, raw):
-    return f"data:{mime};base64," + base64.b64encode(raw).decode()
 
 
 @pytest.fixture()
@@ -132,7 +115,7 @@ def test_video_tts_subtitle_flow(client):
     res = client.post(f"/api/v1/projects/{prj['id']}/scenes/{scn['id']}/tts",
                       json={})
     assert res.status_code == 200, res.text
-    assert res.json()["data"]["artifacts"][0]["duration_s"] == pytest.approx(2.0, abs=0.05)
+    assert res.json()["data"]["artifacts"][0]["duration_s"] == pytest.approx(1.0, abs=0.05)
     res = client.post(f"/api/v1/projects/{prj['id']}/scenes/{scn['id']}/subtitle",
                       json={})
     assert res.status_code == 200
@@ -275,3 +258,15 @@ def test_media_secret_absence_and_usage(client):
     blob = (client.get(f"/api/v1/projects/{prj['id']}/artifacts").text
             + client.get("/api/v1/ai/activity").text)
     assert "sk-x" not in blob
+
+
+def test_truncated_png_rejected_before_ffmpeg(client):
+    """Header-only PNGs must fail validation fast, never hang a decoder."""
+    import struct as _s
+    prj, scn = setup(client)
+    truncated = (b"\x89PNG\r\n\x1a\n" + _s.pack(">I", 13) + b"IHDR" +
+                 _s.pack(">IIBBBBB", 8, 6, 8, 2, 0, 0, 0) + _s.pack(">I", 0))
+    A._ADAPTERS["test"].queue_media(True, data_url("image/png", truncated))
+    res = client.post(f"/api/v1/projects/{prj['id']}/scenes/{scn['id']}/image",
+                      json={})
+    assert res.json()["error"]["code"] == "INVALID_RESPONSE"

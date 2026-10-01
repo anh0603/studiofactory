@@ -99,19 +99,13 @@ def wait_status(client, run_id, want=("COMPLETED", "FAILED", "BLOCKED",
 
 
 def png_b64():
-    import base64 as _b, struct as _s
-    raw = (b"\x89PNG\r\n\x1a\n" + _s.pack(">I", 13) + b"IHDR" +
-           _s.pack(">IIBBBBB", 8, 6, 8, 2, 0, 0, 0) + _s.pack(">I", 0))
-    return "data:image/png;base64," + _b.b64encode(raw).decode()
+    from helpers import data_url, valid_png_bytes
+    return data_url("image/png", valid_png_bytes())
 
 
 def wav_b64():
-    import base64 as _b, struct as _s
-    n = 8000
-    raw = (b"RIFF" + _s.pack("<I", 36 + n) + b"WAVE" + b"fmt " +
-           _s.pack("<IHHIIHH", 16, 1, 1, 8000, 8000, 1, 8) + b"data" +
-           _s.pack("<I", n) + b"\x00" * n)
-    return "data:audio/wav;base64," + _b.b64encode(raw).decode()
+    from helpers import data_url, valid_wav_bytes
+    return data_url("audio/wav", valid_wav_bytes())
 
 
 def test_config_validation(tmp_path, monkeypatch):
@@ -131,7 +125,8 @@ def test_config_validation(tmp_path, monkeypatch):
 
 
 def test_run_fails_honestly_without_media_stack(tmp_path, monkeypatch):
-    """No ffmpeg in env -> engine jobs fail -> run FAILED with counters, no schedule."""
+    """Shared PLAN has no scenes, so the engine job fails honestly in any env
+    (nothing to render) -> run FAILED with counters, no schedule."""
     client, _ = make_client(tmp_path, monkeypatch)
     setup_ai(client)
     prj, _ = setup_project(client)

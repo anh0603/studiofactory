@@ -38,6 +38,7 @@ def test_unknown_route_uses_typed_error_without_secret():
 
 
 def test_diagnostics_real_shape_no_fake_healthy():
+    import shutil
     res = client.get("/api/v1/diagnostics")
     assert res.status_code == 200
     body = res.json()
@@ -46,8 +47,11 @@ def test_diagnostics_real_shape_no_fake_healthy():
     for key in ("backend", "database", "storage", "ffmpeg"):
         assert key in checks
         assert checks[key]["status"] in ("HEALTHY", "UNAVAILABLE", "UNKNOWN", "CONFIG_REQUIRED")
-    # This env has no ffmpeg -> must be UNAVAILABLE, never fake HEALTHY.
-    assert checks["ffmpeg"]["status"] == "UNAVAILABLE"
+    # Honest either way: HEALTHY iff a real binary exists, else UNAVAILABLE.
+    if shutil.which("ffmpeg"):
+        assert checks["ffmpeg"]["status"] == "HEALTHY"
+    else:
+        assert checks["ffmpeg"]["status"] == "UNAVAILABLE"
     dumped = str(body).lower()
     assert "sk-" not in dumped or "sk-****" in dumped
 

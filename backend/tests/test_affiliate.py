@@ -20,11 +20,7 @@ from app.db.base import Base  # noqa: E402
 from app.db import models as M  # noqa: E402
 from app.db.session import get_db  # noqa: E402
 from app.main import create_app  # noqa: E402
-
-
-def png_bytes():
-    return (b"\x89PNG\r\n\x1a\n" + struct.pack(">I", 13) + b"IHDR" +
-            struct.pack(">IIBBBBB", 8, 6, 8, 2, 0, 0, 0) + struct.pack(">I", 0))
+from helpers import valid_png_bytes as png_bytes  # noqa: E402
 
 
 def make_client(tmp_path, monkeypatch):

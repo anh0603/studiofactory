@@ -22,32 +22,44 @@ def require() -> str:
     return exe
 
 
-def run(args: list[str], timeout_s: float = 120.0) -> tuple[int, str]:
+def run(args: list[str], timeout_s: float = 120.0,
+        cwd: str | Path | None = None) -> tuple[int, str]:
     """Run ffmpeg with argv array. Returns (returncode, stderr tail)."""
     exe = require()
     for a in args:
         if not isinstance(a, str) or "\x00" in a:
             raise ValueError("invalid ffmpeg argument")
     proc = subprocess.run([exe, "-y", *args], capture_output=True, text=True,
-                          timeout=timeout_s, shell=False, cwd=tempfile.gettempdir())
+                          timeout=timeout_s, shell=False,
+                          cwd=str(cwd) if cwd else tempfile.gettempdir())
     return proc.returncode, proc.stderr[-2000:]
 
 
 def compose_scene(image: Path, audio: Path | None, subtitle: Path | None,
                   out: Path, duration_s: float, width: int = 720,
                   height: int = 1280, timeout_s: float = 120.0) -> None:
-    """Still-image + audio (+srt) -> mp4. Raises on failure."""
+    """Still-image + audio (+srt) -> mp4. Raises on failure.
+
+    Subtitles are muxed as a real mov_text stream (selectable subtitles),
+    never burned via libass: the subtitles filter hangs on this Windows
+    build (verified), while muxing is fast, deterministic, and keeps the
+    SRT content verifiable via ffprobe.
+    """
     cmd: list[str] = ["-loop", "1", "-i", str(image)]
     if audio is not None:
         cmd += ["-i", str(audio)]
+    if subtitle is not None:
+        cmd += ["-i", str(subtitle)]
     vf = f"scale={width}:{height}:force_original_aspect_ratio=increase," \
          f"crop={width}:{height}"
-    if subtitle is not None:
-        vf += f",subtitles={_esc(str(subtitle))}"
     cmd += ["-vf", vf, "-c:v", "libx264", "-pix_fmt", "yuv420p",
             "-t", f"{max(duration_s, 0.5):.2f}"]
     if audio is not None:
-        cmd += ["-c:a", "aac", "-shortest"]
+        cmd += ["-c:a", "aac"]
+    if subtitle is not None:
+        cmd += ["-c:s", "mov_text"]
+    if audio is not None:
+        cmd += ["-shortest"]
     cmd.append(str(out))
     code, err = run(cmd, timeout_s)
     if code != 0 or not out.exists() or out.stat().st_size == 0:

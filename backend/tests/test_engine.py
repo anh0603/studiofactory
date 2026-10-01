@@ -23,22 +23,7 @@ from app.db import models as M  # noqa: E402
 from app.db.session import get_db  # noqa: E402
 import app.engine.runner as R  # noqa: E402
 from app.main import create_app  # noqa: E402
-
-
-def png_bytes():
-    return (b"\x89PNG\r\n\x1a\n" + struct.pack(">I", 13) + b"IHDR" +
-            struct.pack(">IIBBBBB", 8, 6, 8, 2, 0, 0, 0) + struct.pack(">I", 0))
-
-
-def wav_bytes(duration_s=1.0, rate=8000):
-    n = int(duration_s * rate)
-    return (b"RIFF" + struct.pack("<I", 36 + n) + b"WAVE" + b"fmt " +
-            struct.pack("<IHHIIHH", 16, 1, 1, rate, rate, 1, 8) + b"data" +
-            struct.pack("<I", n) + b"\x00" * n)
-
-
-def data_url(mime, raw):
-    return f"data:{mime};base64," + base64.b64encode(raw).decode()
+from helpers import data_url, valid_png_bytes as png_bytes, valid_wav_bytes as wav_bytes  # noqa: E402
 
 
 PLAN = {"title": "T", "concept": "c", "hook": "h", "audience": "a", "tone": "t",
@@ -122,6 +107,8 @@ def test_job_requires_approval(tmp_path, monkeypatch):
 
 
 def test_full_pipeline_sync_success_and_events(tmp_path, monkeypatch):
+    import shutil as _sh
+    HAS_FFMPEG = _sh.which("ffmpeg") is not None
     client, Sessions = make_client(tmp_path, monkeypatch)
     prj, _ = setup_project(client)
     queue_media()
@@ -131,8 +118,8 @@ def test_full_pipeline_sync_success_and_events(tmp_path, monkeypatch):
     assert res.status_code == 201, res.text
     job_id = res.json()["data"]["id"]
     summary = R.run_job(job_id, "req_test")
-    # No ffmpeg in env -> COMPOSE nodes fail with FFMPEG_UNAVAILABLE (retryable),
-    # job ends FAILED honestly after bounded attempts.
+    # Without ffmpeg COMPOSE fails FFMPEG_UNAVAILABLE (bounded, honest);
+    # with real ffmpeg the whole DAG succeeds.
     db = Sessions()
     try:
         job = db.get(M.Job, job_id)
@@ -144,11 +131,17 @@ def test_full_pipeline_sync_success_and_events(tmp_path, monkeypatch):
         assert by_type["IMAGE"] == ["SUCCEEDED"]
         assert by_type["TTS"] == ["SUCCEEDED"]
         assert by_type["SUBTITLE"] == ["SUCCEEDED"]
-        # Compose blocked on missing ffmpeg: FAILED after retries, honest.
-        assert by_type["COMPOSE"] == ["FAILED"]
-        assert job.status == "FAILED"
-        # Failure propagation: downstream never ran to success.
-        assert "SUCCEEDED" not in by_type.get("PROJECT_COMPOSE", ["FAILED"])
+        if HAS_FFMPEG:
+            # Real ffmpeg present: compose + project compose + QC run for real.
+            assert by_type["COMPOSE"] == ["SUCCEEDED"]
+            assert job.status == "SUCCEEDED"
+            assert by_type.get("PROJECT_COMPOSE") == ["SUCCEEDED"]
+        else:
+            # Compose blocked on missing ffmpeg: FAILED after retries, honest.
+            assert by_type["COMPOSE"] == ["FAILED"]
+            assert job.status == "FAILED"
+            # Failure propagation: downstream never ran to success.
+            assert "SUCCEEDED" not in by_type.get("PROJECT_COMPOSE", ["FAILED"])
         events = db.scalars(select(M.JobEvent).where(
             M.JobEvent.job_id == job_id).order_by(M.JobEvent.created_at)).all()
         # Dependency ordering: COMPOSE started only after IMAGE+TTS succeeded.
@@ -165,13 +158,16 @@ def test_full_pipeline_sync_success_and_events(tmp_path, monkeypatch):
             M.JobEvent.job_id == job_id).order_by(M.JobEvent.created_at)).all()
         kinds = [e.event for e in events]
         assert kinds[0] == "job.created"
-        assert "job.failed" in kinds
+        if HAS_FFMPEG:
+            assert "job.completed" in kinds
+        else:
+            assert "job.failed" in kinds
         assert "sk-x" not in str([(e.event, e.status) for e in events])
         # progress never fabricated.
         assert job.progress_percent is None
     finally:
         db.close()
-    assert summary["status"] == "FAILED"
+    assert summary["status"] == ("SUCCEEDED" if HAS_FFMPEG else "FAILED")
 
 
 def test_failure_retry_flow(tmp_path, monkeypatch):
