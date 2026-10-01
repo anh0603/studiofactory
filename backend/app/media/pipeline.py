@@ -95,6 +95,8 @@ def generate_bytes(kind: str, prompt: str, db, request_id: str,
     if not result.ok:
         raise PipelineError(result.error_code or "UNKNOWN_ERROR",
                             result.error_message or f"{kind} generation failed.")
+    if not isinstance(result.output, str) or not result.output:
+        raise PipelineError("INVALID_RESPONSE", "Adapter returned empty payload.")
     try:
         data, _mime = decode_payload(result.output)
     except MediaInvalid as exc:

@@ -175,7 +175,11 @@ class OpenAICompatibleAdapter(ProviderAdapter):
         try:
             with urllib.request.urlopen(req, timeout=request.timeout_s) as resp:
                 data = _json.loads(resp.read().decode())
-                text = data["choices"][0]["message"]["content"]
+                text = data["choices"][0]["message"].get("content") or ""
+                if not text.strip():
+                    return AdapterResult(ok=False, error_code="INVALID_RESPONSE",
+                                         error_message="provider returned empty content",
+                                         latency_ms=int((time.monotonic() - started) * 1000))
                 return AdapterResult(ok=True, output=text,
                                      latency_ms=int((time.monotonic() - started) * 1000))
         except urllib.error.HTTPError as exc:  # type: ignore[attr-defined]

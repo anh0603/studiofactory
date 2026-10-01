@@ -88,6 +88,8 @@ def build_section_prompt(section: str, current: dict[str, Any], idea: str,
 
 def extract_json(text: str) -> Any:
     """Parse model output, tolerating markdown fences. Raises ValueError."""
+    if not isinstance(text, str) or not text.strip():
+        raise ValueError("empty model output")
     cleaned = text.strip()
     if cleaned.startswith("```"):
         lines = cleaned.split("\n")

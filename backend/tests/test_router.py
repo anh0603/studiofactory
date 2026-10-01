@@ -332,3 +332,39 @@ def test_ssrf_provider_url_rejected(client):
         res = client.post("/api/v1/ai/providers",
                           json={"name": "evil", "adapter_key": "custom", "base_url": bad})
         assert res.status_code == 400, bad
+
+
+def test_empty_content_never_propagates_none():
+    """Real bug (Phase 11B): provider content:null must become typed failure."""
+    import json as _json
+    from app.ai.adapters import AdapterRequest, OpenAICompatibleAdapter
+    from app.ai.director import extract_json
+    import pytest as _p
+    with _p.raises(ValueError):
+        extract_json(None)
+    with _p.raises(ValueError):
+        extract_json("   ")
+
+    class _Resp:
+        status = 200
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *a):
+            return False
+
+        def read(self):
+            return _json.dumps(
+                {"choices": [{"message": {"content": None}}]}).encode()
+
+    import urllib.request as _u
+    orig = _u.urlopen
+    _u.urlopen = lambda *a, **k: _Resp()
+    try:
+        res = OpenAICompatibleAdapter("https://api.example.invalid").generate(
+            AdapterRequest(task="T", capability="TEXT", prompt="hi",
+                           model_id="m"), "sk-x")
+    finally:
+        _u.urlopen = orig
+    assert res.ok is False and res.error_code == "INVALID_RESPONSE"
