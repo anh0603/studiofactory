@@ -1,0 +1,14 @@
+# AI Short Factory Web Pro — backend requirements (pinned Phase 10).
+# No AI SDK, no video SDK, no social/OAuth SDK. Minimal set.
+# Pins verified on Python 3.14 (Windows). Regenerate lock via:
+#   pip freeze | Select-String -Pattern "^(fastapi|uvicorn|...)==" > requirements.lock.txt
+fastapi==0.138.0
+uvicorn==0.49.0
+pydantic==2.13.4
+SQLAlchemy==2.0.52
+alembic==1.19.2
+cryptography==50.0.0
+pytest==9.1.1
+httpx==0.28.1
+anyio==4.14.0
+python-multipart==0.0.32

@@ -1,0 +1,10 @@
+__pycache__/
+*.pyc
+.pytest_cache/
+*.db
+*.enc
+.credential_master.key
+node_modules/
+dist/
+projects/
+.env
