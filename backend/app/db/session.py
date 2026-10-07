@@ -11,7 +11,10 @@ from ..core.config import settings
 
 def _connect_args(url: str) -> dict:
     if url.startswith("sqlite"):
-        return {"check_same_thread": False}
+        # check_same_thread: engine worker + autopilot threads share the file.
+        # timeout: wait on writer locks instead of failing instantly (Phase C:
+        # background autopilot thread + engine worker contend on SQLite).
+        return {"check_same_thread": False, "timeout": 30.0}
     return {}
 
 

@@ -209,9 +209,11 @@ def _execute_node(db, job, node, request_id: str) -> tuple[bool, str, dict]:
             prompt = (scene.visual_prompt or scene.description) if kind != "TTS" else scene.dialogue
         from ..ai.router import RouteInput, Router
         models, providers, secrets, refs = _registry_full(db)
+        # Free-tier media is slow: 20s default aborts real generations.
+        timeouts = {"IMAGE": 120.0, "VIDEO": 180.0, "TTS": 60.0}
         result = Router().route_media(kind, models, providers, secrets, refs, RouteInput(
             task=task_cap[0], capability=task_cap[1], prompt=prompt or "still",
-            max_attempts=2), request_id)
+            max_attempts=2, timeout_s=timeouts[kind]), request_id)
         from ..ai.usage import record_routing
         record_routing(db, request_id=request_id, task=task_cap[0],
                        capability=task_cap[1], result=result, providers=providers,
@@ -242,7 +244,9 @@ def _execute_node(db, job, node, request_id: str) -> tuple[bool, str, dict]:
                 "cost_class": win.get("cost_class", "UNKNOWN"),
                 "license_status": win.get("license_status", "UNVERIFIED")}
         subdir = {"IMAGE": "scenes", "TTS": "audio", "VIDEO": "scenes"}[kind]
-        ext = {"IMAGE": ".png", "TTS": ".wav", "VIDEO": ".mp4"}[kind]
+        img_ext = {"image/png": ".png", "image/jpeg": ".jpg",
+                   "image/webp": ".webp"}.get(mime, ".png") if kind == "IMAGE" else None
+        ext = {"IMAGE": img_ext, "TTS": ".wav", "VIDEO": ".mp4"}[kind]
         art = persist_artifact(db, storage, project_id, subdir,
                                f"{node.id}{ext}", data, kind, mime, meta,
                                request_id, job.id,
@@ -411,19 +415,60 @@ def _deps_succeeded(db, node) -> bool:
     return True
 
 
+TERMINAL_JOB = ("SUCCEEDED", "FAILED", "CANCELLED", "BLOCKED",
+                "AWAITING_APPROVAL", "PUBLISHED")
+_CLAIM_WAIT_S = 1800.0
+
+
+def _wait_job_terminal(job_id: str) -> dict:
+    """Another executor claimed the job: wait for its terminal state instead
+    of running it twice (duplicate AI spend + Ouroboros locking). Phase C."""
+    import time as _t
+    from ..db import models as _M
+    deadline = _t.monotonic() + _CLAIM_WAIT_S
+    while _t.monotonic() < deadline:
+        _t.sleep(2.0)
+        db2 = _sessions()
+        try:
+            job = db2.get(_M.Job, job_id)
+            if job is None:
+                return {"ok": False, "error": "NOT_FOUND"}
+            if job.status in TERMINAL_JOB:
+                ok = job.status in ("SUCCEEDED", "AWAITING_APPROVAL")
+                return {"ok": ok, "status": job.status, "note": "executed by worker"}
+            if job.status == "PAUSED":
+                return {"ok": True, "status": "PAUSED", "note": "paused; resume to continue"}
+        finally:
+            db2.close()
+    return {"ok": False, "error": "CLAIM_TIMEOUT",
+            "status": "RUNNING", "note": "claim lost; holder did not finish in time"}
+
+
 def run_job(job_id: str, request_id: str = "") -> dict:
     """Execute a job synchronously to completion/pause/cancel. Returns summary."""
     from ..db import models as M
+    from sqlalchemy import update as _update
     db = _sessions()
     try:
         job = db.get(M.Job, job_id)
         if job is None:
             return {"ok": False, "error": "NOT_FOUND"}
-        if job.status in ("SUCCEEDED", "FAILED", "CANCELLED", "BLOCKED",
-                          "AWAITING_APPROVAL", "PUBLISHED"):
+        if job.status in TERMINAL_JOB:
             return {"ok": True, "status": job.status, "note": "terminal; no-op"}
         if job.status == "PAUSED":
             return {"ok": True, "status": "PAUSED", "note": "paused; resume to continue"}
+        # Atomic claim: engine worker and autopilot race on the same QUEUED
+        # row (create_job auto-dispatches AND autopilot calls run_job).
+        # Loser waits for the winner's terminal state. Phase C.
+        if job.status == "QUEUED":
+            claimed = db.execute(_update(M.Job).where(
+                M.Job.id == job_id, M.Job.status == "QUEUED").values(
+                    status="RUNNING", stage="RUNNING")).rowcount
+            db.commit()
+            if not claimed:
+                db.close()
+                return _wait_job_terminal(job_id)
+            db.refresh(job)
         rid = request_id or f"req_{uuid.uuid4().hex[:12]}"
         job.status = "RUNNING"
         job.stage = "RUNNING"
@@ -480,6 +525,7 @@ def run_job(job_id: str, request_id: str = "") -> dict:
             ok, err, output = _execute_node(db, job, node, rid)
             if ok:
                 node.status = "SUCCEEDED"
+                node.error_code = None  # stale errors must not stick to success
                 node.output_artifact_id = json.dumps(output)
                 emit(db, job.id, "job.artifact_completed" if output.get("artifact_ids")
                      else "job.stage_changed", node.id, node.provider, node.model,
@@ -487,13 +533,14 @@ def run_job(job_id: str, request_id: str = "") -> dict:
             else:
                 if err in RETRYABLE_NODE_ERRORS and node.attempts < MAX_NODE_ATTEMPTS:
                     node.status = "RETRY_QUEUED"
-                    node.error_code = err
+                    node.error_code = err or "UNKNOWN_ERROR"
                     emit(db, job.id, "job.stage_changed", node.id, status="RETRY_QUEUED",
-                         error=err)
+                         error=err or "UNKNOWN_ERROR")
                 else:
                     node.status = "FAILED"
-                    node.error_code = err
-                    emit(db, job.id, "job.error", node.id, status="FAILED", error=err)
+                    node.error_code = err or "UNKNOWN_ERROR"
+                    emit(db, job.id, "job.error", node.id, status="FAILED",
+                         error=err or "UNKNOWN_ERROR")
             db.commit()
             progress = True
         # Terminal resolution.
@@ -538,6 +585,15 @@ def recover_stuck() -> list[str]:
                 n.status = "PENDING"
             emit(db, job.id, "job.status_changed", status="QUEUED")
             out.append(job.id)
+        # Autopilot runs interrupted mid-flight (their worker thread is gone
+        # with the old process) must not freeze in RUNNING forever. They go
+        # back to FAILED with an honest note; the user starts a fresh run.
+        # Phase C.
+        for run in db.scalars(select(M.AutopilotRun).where(
+                M.AutopilotRun.status.in_(("RUNNING", "PAUSED")))).all():
+            run.status = "FAILED"
+            run.note = "interrupted by backend restart; start a new run"
+            out.append(run.id)
         db.commit()
         return out
     finally:

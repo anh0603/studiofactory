@@ -69,6 +69,10 @@ class ProviderAdapter(ABC):
             if "quota" in low or "exceed" in low:
                 return "QUOTA_EXHAUSTED"
             return "RATE_LIMITED"
+        if status == 402:
+            # Free/anonymous tiers (pollinations) answer 402 when the shared
+            # quota is exhausted. Retryable: another window may serve. Phase C.
+            return "QUOTA_EXHAUSTED"
         if status == 408:
             return "TIMEOUT"
         if 500 <= status <= 599:

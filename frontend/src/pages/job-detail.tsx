@@ -88,8 +88,8 @@ export function JobDetailPage() {
                     <StatusBadge value={n.status} />
                     {n.attempts > 1 ? <span className="text-xs text-muted">thử {n.attempts} lần</span> : null}
                   </div>
-                  {(n.provider || n.error_code) ? (
-                    <p className="mono mt-0.5 truncate text-secondary">{[n.provider, n.model, labelVi(n.error_code ?? '')].filter(Boolean).join(' · ')}</p>
+                  {(n.provider || (n.error_code && n.status !== 'SUCCEEDED' && n.status !== 'SKIPPED_REUSE')) ? (
+                    <p className="mono mt-0.5 truncate text-secondary">{[n.provider, n.model, (n.status === 'SUCCEEDED' || n.status === 'SKIPPED_REUSE') ? '' : labelVi(n.error_code ?? '')].filter(Boolean).join(' · ')}</p>
                   ) : null}
                 </div>
               </li>

@@ -72,7 +72,11 @@ DB_FACTORY = None
 
 def execute_run_in_background(run_id: str, request_id: str,
                               db_factory=None) -> None:
-    """Thread entry: fresh session, load run+config, execute, close."""
+    """Thread entry: fresh session, load run+config, execute, close.
+
+    Never die silently: an unexpected exception marks the run FAILED with
+    its cause instead of freezing it in RUNNING forever. Phase C.
+    """
     from ..db import models as M
     factory = db_factory or _db_factory()
     db = factory()
@@ -82,6 +86,15 @@ def execute_run_in_background(run_id: str, request_id: str,
             return
         config = db.get(M.AutopilotConfig, run.config_id)
         execute_run(db, run, config, request_id)
+    except Exception as exc:  # noqa: BLE001 - record, don't freeze
+        try:
+            run = db.get(M.AutopilotRun, run_id)
+            if run is not None and run.status in ("RUNNING", "PAUSED"):
+                run.status = "FAILED"
+                run.note = f"worker crashed: {type(exc).__name__}: {str(exc)[:200]}"
+                db.commit()
+        except Exception:  # noqa: BLE001 - last resort: nothing to do
+            pass
     finally:
         db.close()
 

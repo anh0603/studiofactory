@@ -30,8 +30,12 @@ Backend:
 cd backend
 pip install -r requirements.txt
 alembic upgrade head
-uvicorn app.main:app --reload --port 8000
+uvicorn app.main:app --reload --port 8000 --reload-exclude "*/__pycache__/*" --reload-exclude "*.pyc"
 ```
+
+> `--reload-exclude` keeps bytecode churn from restarting the worker mid-run
+> (a restart orphans in-flight autopilot/engine threads; startup recovery
+> marks them honestly instead of freezing).
 
 Frontend:
 

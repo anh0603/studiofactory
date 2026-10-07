@@ -308,3 +308,72 @@ def test_websocket_receives_job_events(tmp_path, monkeypatch):
                                       "job_id": "JOB-X", "status": "QUEUED"})
         msg = ws.receive_json()
         assert msg["job_id"] == "JOB-X"
+
+# ------------------------------------------------------- Phase C hardening
+
+def test_402_maps_quota_exhausted_retryable():
+    from app.ai.policies import RETRYABLE
+    assert A.ProviderAdapter.classify_http(402, "") == "QUOTA_EXHAUSTED"
+    assert "QUOTA_EXHAUSTED" in RETRYABLE
+
+
+def test_concurrent_run_job_executes_once(tmp_path, monkeypatch):
+    """Engine worker + autopilot race on the same QUEUED job: atomic claim
+    lets exactly one executor run; the loser waits for terminal state."""
+    import threading
+    client, Sessions = make_client(tmp_path, monkeypatch)
+    prj, _ = setup_project(client)
+    queue_media()
+    res = client.post("/api/v1/jobs", json={"project_id": prj["id"],
+                                            "kind": "FULL_PIPELINE",
+                                            "idempotency_key": "race-1"})
+    assert res.status_code == 201, res.text
+    job_id = res.json()["data"]["id"]
+    outs = []
+
+    def run_delayed():
+        import time as _t
+        _t.sleep(0.05)
+        outs.append(R.run_job(job_id, "req_racer"))
+
+    t = threading.Thread(target=run_delayed)
+    t.start()
+    outs.append(R.run_job(job_id, "req_main"))
+    t.join(timeout=120)
+    assert not t.is_alive()
+    assert len(outs) == 2
+    db = Sessions()
+    try:
+        nodes = db.scalars(select(M.WorkflowNode).where(
+            M.WorkflowNode.job_id == job_id)).all()
+        # No node executed twice: single execution despite two callers.
+        assert all(n.attempts <= 1 for n in nodes), \
+            [(n.type, n.attempts) for n in nodes]
+        job = db.get(M.Job, job_id)
+        assert job.status in ("SUCCEEDED", "FAILED")
+    finally:
+        db.close()
+
+
+def test_recover_stuck_fails_orphan_autopilot_runs(tmp_path, monkeypatch):
+    """Interrupted autopilot runs must not freeze in RUNNING after restart."""
+    client, Sessions = make_client(tmp_path, monkeypatch)
+    db = Sessions()
+    try:
+        db.add(M.AutopilotRun(id="apr_orphan", config_id="apc_x",
+                              project_id="prj_x", status="RUNNING"))
+        db.add(M.AutopilotRun(id="apr_done", config_id="apc_x",
+                              project_id="prj_x", status="COMPLETED"))
+        db.commit()
+    finally:
+        db.close()
+    out = R.recover_stuck()
+    assert "apr_orphan" in out
+    db = Sessions()
+    try:
+        orphan = db.get(M.AutopilotRun, "apr_orphan")
+        assert orphan.status == "FAILED"
+        assert "restart" in orphan.note
+        assert db.get(M.AutopilotRun, "apr_done").status == "COMPLETED"
+    finally:
+        db.close()
