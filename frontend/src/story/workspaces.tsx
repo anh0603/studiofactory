@@ -8,9 +8,7 @@ import { ExplainError } from '../components/explain-error'
 import { api } from '../api/client'
 import type { QcResultLite, StepId } from '../story/workflow'
 
-/* One workspace per workflow node. Each one shows the work of that node only.
-   No artifact bytes endpoint exists for story projects, so nothing here
-   pretends to render an image, audio or video. BACKEND GAP. */
+/* One workspace per workflow node. Each one shows the work of that node only. */
 
 export interface WorkspaceProps {
   activeStep: StepId
@@ -90,11 +88,20 @@ function ArtifactList({
             <li key={a.id} className="rounded-lg border border-border bg-bg px-3 py-2">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <span className="text-[13px] font-medium">{sceneName(a.scene_id)}</span>
-                <span className="mono shrink-0 text-[11px] text-muted">
-                  {enumVi(a.kind, artifactKindVi)} · {bytes(a.bytes)}
-                  {a.duration_s ? ` · ${a.duration_s.toFixed(1)}s` : ''}
-                  {a.width && a.height ? ` · ${a.width}×${a.height}` : ''}
-                </span>
+                <div className="flex shrink-0 items-center gap-2">
+                  <span className="mono text-[11px] text-muted">
+                    {enumVi(a.kind, artifactKindVi)} · {bytes(a.bytes)}
+                    {a.duration_s ? ` · ${a.duration_s.toFixed(1)}s` : ''}
+                    {a.width && a.height ? ` · ${a.width}×${a.height}` : ''}
+                  </span>
+                  <a
+                    href={api.artifactUrl(a.id)}
+                    download={a.path.split('/').pop() || a.id}
+                    className="link-accent text-[12px]"
+                  >
+                    Tải xuống
+                  </a>
+                </div>
               </div>
               {actions && a.scene_id ? actions(scenes.find((s) => s.id === a.scene_id)!) : null}
             </li>
@@ -911,9 +918,18 @@ return (
           <Card>
             <h2 className="section-title mb-1">Đầu ra dự án</h2>
             {output ? (
-              <p className="mono text-[13px] text-secondary">
-                {output.width}×{output.height} · {output.duration_s?.toFixed(1) ?? '?'}s · {bytes(output.bytes)}
-              </p>
+              <>
+                <p className="mono text-[13px] text-secondary">
+                  {output.width}×{output.height} · {output.duration_s?.toFixed(1) ?? '?'}s · {bytes(output.bytes)}
+                </p>
+                <a
+                  href={api.artifactUrl(output.id)}
+                  download={output.path.split('/').pop() || 'final.mp4'}
+                  className="link-accent mt-1.5 inline-block text-[13px]"
+                >
+                  Tải video xuống
+                </a>
+              </>
             ) : (
               <p className="text-[13px] text-secondary">Chưa có video dự án.</p>
             )}

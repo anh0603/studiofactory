@@ -14,7 +14,6 @@ from .health import router as health_router
 from .jobs import router as jobs_router
 from .media import router as media_router
 from .publisher import router as publisher_router
-from .settings import router as settings_router
 from .story import router as story_router
 
 router = APIRouter()
@@ -27,7 +26,6 @@ router.include_router(director_router, tags=["director"])
 router.include_router(media_router, tags=["media"])
 router.include_router(autopilot_router, tags=["automation"])
 router.include_router(publisher_router, tags=["publisher"])
-router.include_router(settings_router, tags=["settings"])
 router.include_router(affiliate_router, tags=["affiliate"])
 router.include_router(analytics_router, tags=["analytics"])
 router.include_router(jobs_router, tags=["jobs"])

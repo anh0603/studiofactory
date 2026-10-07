@@ -458,14 +458,4 @@ def export_video(video_id: str, request: Request,
     v.export_manifest = manifest
     v.status = "EXPORTED"
     db.commit()
-    from pathlib import Path as _Path
-    from .settings import copy_to_export_dir
-    items = [(storage.resolve_affiliate(p.id, rel), _Path(rel).name)]
-    if v.visual_artifact_id:
-        try:
-            items.append((storage.resolve_affiliate(p.id, v.visual_artifact_id),
-                          _Path(v.visual_artifact_id).name))
-        except Exception:  # noqa: BLE001 - export still succeeds, file skipped
-            pass
-    saved = copy_to_export_dir(db, items)
-    return {"request_id": rid, "data": {"video_id": v.id, "manifest": manifest, **saved}}
+    return {"request_id": rid, "data": {"video_id": v.id, "manifest": manifest}}

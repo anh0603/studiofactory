@@ -1,4 +1,4 @@
-"""Settings export-dir, affiliate script reorder, media file serving."""
+"""Affiliate script reorder + media file serving (Range)."""
 from __future__ import annotations
 
 import os
@@ -52,28 +52,6 @@ def _db(client):
     return client.testing_session()
 
 
-def test_export_dir_validation(tmp_path, client):
-    # Relative path rejected.
-    res = client.put("/api/v1/settings", json={"export_dir": "relative/path"})
-    assert res.status_code == 422
-    # Empty rejected.
-    res = client.put("/api/v1/settings", json={"export_dir": "   "})
-    assert res.status_code == 422
-    # Absolute path accepted and reported OK.
-    target = tmp_path / "exports-out"
-    res = client.put("/api/v1/settings", json={"export_dir": str(target)})
-    assert res.status_code == 200, res.text
-    data = res.json()["data"]
-    assert data["export_dir_state"] == "OK"
-    assert target.is_dir()
-    # GET reflects it.
-    res = client.get("/api/v1/settings")
-    assert res.json()["data"]["export_dir_state"] == "OK"
-    # Clearing returns to UNSET.
-    res = client.delete("/api/v1/settings/export-dir")
-    assert res.json()["data"]["export_dir_state"] == "UNSET"
-
-
 def test_script_reorder(client):
     db = _db(client)
     p = M.AffiliateProduct(id="afp_1", name="P")
@@ -96,30 +74,6 @@ def test_script_reorder(client):
     assert [s["id"] for s in res.json()["data"]] == ["s1", "s2", "s3"]
     # Unknown script 404.
     assert client.patch("/api/v1/affiliate/scripts/nope", json={"position": 0}).status_code == 404
-
-
-def test_copy_to_export_dir(tmp_path, client):
-    from app.api.v1.settings import EXPORT_DIR_KEY, copy_to_export_dir
-    dest = tmp_path / "out"
-    dest.mkdir()
-    db = _db(client)
-    db.add(M.Setting(key=EXPORT_DIR_KEY, value_json={"path": str(dest)}))
-    db.commit()
-    src = tmp_path / "final.mp4"
-    src.write_bytes(b"ftyp-fake-bytes")
-    out = copy_to_export_dir(db, [(src, "final.mp4")])
-    assert out["saved_to"] == str(dest)
-    assert out["saved_files"] == ["final.mp4"]
-    assert out["save_error"] is None
-    assert (dest / "final.mp4").read_bytes() == b"ftyp-fake-bytes"
-    db.close()
-    # No export dir configured -> no-op, no error.
-    db2 = _db(client)
-    db2.query(M.Setting).delete()
-    db2.commit()
-    out = copy_to_export_dir(db2, [(src, "final.mp4")])
-    assert out == {"saved_to": None, "saved_files": [], "save_error": None}
-    db2.close()
 
 
 def test_files_guards(client):

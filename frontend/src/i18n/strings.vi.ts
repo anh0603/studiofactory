@@ -36,13 +36,6 @@ export const strings = {
   'settings.appearance': 'Giao diện',
   'settings.theme.light': 'Sáng',
   'settings.theme.dark': 'Tối',
-  'settings.export.title': 'Thư mục lưu tệp xuất',
-  'settings.export.hint': 'Máy chủ chạy trên chính máy này nên có thể chép video đã xuất vào thư mục bạn chọn.',
-  'settings.export.placeholder': 'Ví dụ: D:\\Videos hoặc /home/ban/Videos',
-  'settings.export.save': 'Lưu thư mục',
-  'settings.export.clear': 'Bỏ chọn',
-  'settings.export.unset': 'Chưa chọn thư mục — tệp xuất chỉ nằm trong dự án.',
-  'settings.video.title': 'Xem video',
   'affiliate.drop.image': 'Kéo thả ảnh sản phẩm vào đây',
   'affiliate.scripts.reorder.hint': 'Kéo thẻ để đổi thứ tự kịch bản.',
 } as const

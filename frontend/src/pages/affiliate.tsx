@@ -52,8 +52,7 @@ export function AffiliatePage() {
   const doExport = async (videoId: string) => {
     try {
       const res = await api.afExportVideo(videoId)
-      const saved = res.data.saved_to
-      setMsg(`Đã xuất tệp: ${res.data.manifest.file}${saved ? ` → ${saved}` : ''}`)
+      setMsg(`Đã xuất tệp: ${res.data.manifest.file}`)
     } catch (e) { setMsg((e as Error).message) }
     qc.invalidateQueries({ queryKey: ['afvideos', sel] })
   }
@@ -209,6 +208,13 @@ export function AffiliatePage() {
                     <span className="mono">{v.id.slice(0, 12)}</span>
                     <span className="flex items-center gap-2">
                       <StatusBadge value={v.status} />
+                      <a
+                        href={api.affiliateVisualUrl(v.id)}
+                        download={`${v.id}.png`}
+                        className="link-accent text-[13px]"
+                      >
+                        Tải ảnh
+                      </a>
                       <Btn variant="link" onClick={() => doExport(v.id)}>Xuất tệp</Btn>
                     </span>
                   </div>

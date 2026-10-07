@@ -486,10 +486,5 @@ def export_project(project_id: str, body: ExportIn, request: Request,
                    idempotency_key=body.idempotency_key or f"im_{uuid.uuid4().hex[:12]}")
     db.add(row)
     db.commit()
-    # Optional: copy finished files to the user's chosen folder on this PC.
-    from .settings import copy_to_export_dir
-    to_copy = [(storage.resolve(project_id, rel), Path(rel).name)
-               for rel in list(files.values()) + [manifest_rel]]
-    saved = copy_to_export_dir(db, to_copy)
     return {"request_id": rid, "data": {"export_id": row.id, "replay": False,
-                                       "manifest": manifest, **saved}}
+                                       "manifest": manifest}}

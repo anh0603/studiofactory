@@ -209,8 +209,7 @@ export function StoryDetailPage() {
             exportProject={async () => {
               const r = await api.exportProject(projectId!)
               const files = Object.keys(r.data.manifest.files ?? {})
-              const base = files.length ? files.join(', ') : r.request_id
-              return r.data.saved_to ? `${base} → ${r.data.saved_to}` : base
+              return files.length ? files.join(', ') : r.request_id
             }}
             createScene={(body) => addScene.mutate(body)}
             scenePending={addScene.isPending}

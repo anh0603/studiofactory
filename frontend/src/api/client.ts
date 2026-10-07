@@ -179,7 +179,7 @@ export const api = {
         body: JSON.stringify({ disclosure: true }),
       }),
   exportProject: (projectId: string) =>
-    request<{ request_id: string; data: { export_id: string; manifest: { files: Record<string, string> }; saved_to: string | null; saved_files: string[]; save_error: string | null } }>(
+    request<{ request_id: string; data: { export_id: string; manifest: { files: Record<string, string> } } }>(
       `/api/v1/projects/${projectId}/export`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ disclosure_text: 'AI-generated content.' }),
@@ -270,25 +270,12 @@ export const api = {
       body: JSON.stringify({ script_id: scriptId, generate_visual: visual }),
     }),
   afExportVideo: (videoId: string) =>
-    request<{ request_id: string; data: { manifest: { file: string }; saved_to: string | null; saved_files: string[]; save_error: string | null } }>(
+    request<{ request_id: string; data: { manifest: { file: string } } }>(
       `/api/v1/affiliate/videos/${videoId}/export`, { method: 'POST' }),
   // --- Analytics (Phase 9, real aggregations) ---
   analytics: () =>
     request<{ request_id: string; data: AnalyticsOverview }>('/api/v1/analytics/overview'),
-  // --- Settings: export folder lives server-side (local-first) ---
-  appSettings: () =>
-    request<{ request_id: string; data: { export_dir: string | null; export_dir_state: string } }>(
-      '/api/v1/settings'),
-  saveExportDir: (export_dir: string) =>
-    request<{ request_id: string; data: { export_dir: string | null; export_dir_state: string } }>(
-      '/api/v1/settings', {
-        method: 'PUT', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ export_dir }),
-      }),
-  clearExportDir: () =>
-    request<{ request_id: string; data: { export_dir: string | null; export_dir_state: string } }>(
-      '/api/v1/settings/export-dir', { method: 'DELETE' }),
-  // --- Media bytes for in-app preview (video player / images) ---
+  // --- Media bytes for in-app preview + download (video player / images) ---
   artifactMeta: (id: string) =>
     request<{ request_id: string; data: Artifact }>(`/api/v1/artifacts/${id}`),
   artifactUrl: (id: string) => `/api/v1/artifacts/${id}/content`,
@@ -333,6 +320,7 @@ export interface JobNode {
   provider: string
   model: string
   error_code: string | null
+  output?: { artifact_ids?: string[] } | null
 }
 
 export interface Job {

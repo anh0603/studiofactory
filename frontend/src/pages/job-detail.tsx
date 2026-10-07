@@ -91,6 +91,15 @@ export function JobDetailPage() {
                   {(n.provider || (n.error_code && n.status !== 'SUCCEEDED' && n.status !== 'SKIPPED_REUSE')) ? (
                     <p className="mono mt-0.5 truncate text-secondary">{[n.provider, n.model, (n.status === 'SUCCEEDED' || n.status === 'SKIPPED_REUSE') ? '' : labelVi(n.error_code ?? '')].filter(Boolean).join(' · ')}</p>
                   ) : null}
+                  {(n.output?.artifact_ids ?? []).length > 0 ? (
+                    <p className="mt-1 flex flex-wrap gap-x-3 gap-y-1">
+                      {(n.output?.artifact_ids ?? []).map((aid) => (
+                        <a key={aid} href={api.artifactUrl(aid)} download={aid} className="link-accent text-[12px]">
+                          Tải xuống
+                        </a>
+                      ))}
+                    </p>
+                  ) : null}
                 </div>
               </li>
             ))}
