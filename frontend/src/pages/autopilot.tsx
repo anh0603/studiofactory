@@ -85,7 +85,7 @@ export function AutopilotPage() {
           <div className="space-y-2">
             <Field aria-label="Chủ đề" value={topics} onChange={(e) => setTopics(e.target.value)} placeholder="chủ đề, cách nhau bởi dấu phẩy" />
             <label className="flex items-center gap-2 text-[13px] text-secondary">
-              <input type="checkbox" checked={requireApproval} onChange={(e) => setRequireApproval(e.target.checked)} className="h-4 w-4 accent-[#F2793C]" />
+              <input type="checkbox" checked={requireApproval} onChange={(e) => setRequireApproval(e.target.checked)} className="h-4 w-4 accent-accent" />
               Duyệt trước khi đăng
             </label>
             <div className="flex gap-2">

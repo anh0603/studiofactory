@@ -1,19 +1,36 @@
-/** Design tokens from design.md #41 + motion tokens for the interaction pass. */
+/** Design tokens from design.md #41 + motion tokens for the interaction pass.
+ *
+ * Colors are CSS-channel variables so the whole UI flips between light
+ * (default) and dark (`.dark` on <html>) without touching any class.
+ * `--c-*` holds "R G B" channels; utilities resolve via <alpha-value>.
+ */
 import { heroui } from '@heroui/react'
 import type { Config } from 'tailwindcss'
+
+const chan = (name: string) => `rgb(var(--c-${name}) / <alpha-value>)`
 
 export default {
   content: ['./index.html', './src/**/*.{ts,tsx}', './node_modules/@heroui/theme/dist/**/*.{js,ts,jsx,tsx}'],
   theme: {
     extend: {
       colors: {
-        bg: '#0B0D10',
-        surface: '#151A21',
-        border: '#2A313B',
-        accent: '#F2793C',
-        ink: '#EDEFF3',
-        secondary: '#A8B1BF',
-        muted: '#7A8598',
+        bg: chan('bg'),
+        surface: chan('surface'),
+        panel: chan('panel'),
+        raised: chan('raised'),
+        elevated: chan('elevated'),
+        chrome: chan('chrome'),
+        border: chan('border'),
+        accent: chan('accent'),
+        ink: chan('ink'),
+        secondary: chan('secondary'),
+        muted: chan('muted'),
+        ember: chan('ember'),
+        warn: chan('warn'),
+        ok: chan('ok'),
+        bad: chan('bad'),
+        tint: chan('tint'),
+        emberline: chan('emberline'),
       },
       transitionDuration: {
         micro: '130ms',
@@ -73,8 +90,13 @@ export default {
   },
   plugins: [
     heroui({
-      defaultTheme: 'dark',
       themes: {
+        light: {
+          colors: {
+            primary: { DEFAULT: '#F2793C', foreground: '#FFFFFF' },
+            focus: '#F2793C',
+          },
+        },
         dark: {
           colors: {
             primary: { DEFAULT: '#F2793C', foreground: '#1A0E07' },

@@ -74,7 +74,7 @@ export function PublisherPage() {
               </li>
             ))}
           </ul>
-          {msg ? <p className="mt-2.5 rounded-lg bg-bg px-2.5 py-2 text-xs text-[#F7A672]">{msg}</p> : null}
+          {msg ? <p className="mt-2.5 rounded-lg bg-bg px-2.5 py-2 text-xs text-ember">{msg}</p> : null}
         </Card>
 
         <Card className="lg:col-span-2">

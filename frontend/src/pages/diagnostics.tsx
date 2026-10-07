@@ -54,8 +54,8 @@ export function DiagnosticsPage() {
       />
 
       {needsConfig > 0 ? (
-        <div className="rounded-xl border border-[#6E4023] bg-[#221610] px-4 py-3">
-          <p className="text-[13px] font-medium text-[#E8B04B]">
+        <div className="rounded-xl border border-emberline bg-tint px-4 py-3">
+          <p className="text-[13px] font-medium text-warn">
             {needsConfig} thành phần chưa cấu hình
           </p>
           <p className="mt-0.5 text-[12px] text-secondary">

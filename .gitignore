@@ -9,3 +9,4 @@ dist/
 projects/
 .env
 backend/projects_preview/
+freellmapi/

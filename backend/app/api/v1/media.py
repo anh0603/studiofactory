@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import json
 import uuid
+from pathlib import Path
 from typing import Any
 
 from fastapi import APIRouter, Depends, Request
@@ -121,7 +122,9 @@ def _gen_kind(kind: str, router_kind: str, body: MediaIn, project_id: str,
     try:
         if kind == "IMAGE":
             mime, w, h = validate_image(data)
-            art = persist_artifact(db, storage, project_id, "scenes", f"{scene_id}_img{EXT[kind]}",
+            img_ext = {"image/png": ".png", "image/jpeg": ".jpg",
+                       "image/webp": ".webp"}.get(mime, EXT[kind])
+            art = persist_artifact(db, storage, project_id, "scenes", f"{scene_id}_img{img_ext}",
                                    data, kind, mime, meta, rid, job.id, scene_id)
             art.update({"width": w, "height": h})
             row = db.get(M.Artifact, art["id"]); row.width = w; row.height = h
@@ -483,5 +486,10 @@ def export_project(project_id: str, body: ExportIn, request: Request,
                    idempotency_key=body.idempotency_key or f"im_{uuid.uuid4().hex[:12]}")
     db.add(row)
     db.commit()
+    # Optional: copy finished files to the user's chosen folder on this PC.
+    from .settings import copy_to_export_dir
+    to_copy = [(storage.resolve(project_id, rel), Path(rel).name)
+               for rel in list(files.values()) + [manifest_rel]]
+    saved = copy_to_export_dir(db, to_copy)
     return {"request_id": rid, "data": {"export_id": row.id, "replay": False,
-                                       "manifest": manifest}}
+                                       "manifest": manifest, **saved}}

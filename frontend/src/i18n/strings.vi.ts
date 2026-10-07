@@ -33,6 +33,18 @@ export const strings = {
   'action.retry': 'Thử lại',
   'palette.title': 'Bảng lệnh nhanh (Ctrl+K)',
   'palette.hint': 'Danh sách lệnh sẽ được bổ sung cùng các tính năng.',
+  'settings.appearance': 'Giao diện',
+  'settings.theme.light': 'Sáng',
+  'settings.theme.dark': 'Tối',
+  'settings.export.title': 'Thư mục lưu tệp xuất',
+  'settings.export.hint': 'Máy chủ chạy trên chính máy này nên có thể chép video đã xuất vào thư mục bạn chọn.',
+  'settings.export.placeholder': 'Ví dụ: D:\\Videos hoặc /home/ban/Videos',
+  'settings.export.save': 'Lưu thư mục',
+  'settings.export.clear': 'Bỏ chọn',
+  'settings.export.unset': 'Chưa chọn thư mục — tệp xuất chỉ nằm trong dự án.',
+  'settings.video.title': 'Xem video',
+  'affiliate.drop.image': 'Kéo thả ảnh sản phẩm vào đây',
+  'affiliate.scripts.reorder.hint': 'Kéo thẻ để đổi thứ tự kịch bản.',
 } as const
 
 export type StringKey = keyof typeof strings
@@ -45,6 +57,7 @@ export const statusVi: Record<string, string> = {
   QUEUED: 'Chờ xử lý', RUNNING: 'Đang chạy', PAUSED: 'Tạm dừng', SUCCEEDED: 'Thành công',
   FAILED: 'Thất bại', CANCELLED: 'Đã huỷ', SKIPPED_REUSE: 'Dùng lại kết quả',
   HEALTHY: 'Ổn định', DEGRADED: 'Suy giảm', NOT_CONFIGURED: 'Chưa cấu hình',
+  NOT_RUNNING: 'Không chạy', ERROR: 'Lỗi', freellmapi: 'FreeLLMAPI',
   CONFIG_REQUIRED: 'Cần cấu hình', REVIEW_REQUIRED: 'Cần xem lại', DISABLED: 'Đã tắt',
   ACTIVE: 'Đang bật', UNVERIFIED: 'Chưa xác minh', VERIFIED: 'Đã xác minh',
   BANNED: 'Bị cấm', DEPRECATED: 'Ngừng dùng', UNAVAILABLE: 'Không dùng được',

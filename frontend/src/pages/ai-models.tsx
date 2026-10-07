@@ -155,7 +155,7 @@ export function AiModelsPage() {
           ].map((s) => (
             <li
               key={s.n}
-              className={`rounded-lg border px-3 py-2 ${step === s.n && !s.done ? 'border-accent bg-[#221610]' : 'border-border bg-bg'}`}
+              className={`rounded-lg border px-3 py-2 ${step === s.n && !s.done ? 'border-accent bg-tint' : 'border-border bg-bg'}`}
             >
               <p className="font-semibold">
                 <span className="mono mr-1.5 text-accent">{s.n}</span>
@@ -236,7 +236,7 @@ export function AiModelsPage() {
           </div>
 
           {credFor ? (
-            <div className="mt-2.5 rounded-lg border border-[#6E4023] bg-[#221610] p-3">
+            <div className="mt-2.5 rounded-lg border border-emberline bg-tint p-3">
               <p className="text-xs text-secondary">
                 Khoá truy cập — nhập một lần, sau đó chỉ hiện trạng thái đã cấu hình.
               </p>
@@ -308,12 +308,12 @@ export function AiModelsPage() {
                       <StatusBadge value={healthVi(m.health_status) === 'Chưa kiểm tra' ? 'UNKNOWN' : m.health_status} label={healthVi(m.health_status)} raw={false} />
                     </p>
                     {blocked.length > 0 ? (
-                      <ul className="mt-1 space-y-0.5 text-[12px] text-[#E8B04B]">
+                      <ul className="mt-1 space-y-0.5 text-[12px] text-warn">
                         {blocked.map((b) => <li key={b}>Bị chặn: {b}</li>)}
                       </ul>
                     ) : null}
                     {t ? (
-                      <p className="mt-1 text-xs text-[#F7A672]">
+                      <p className="mt-1 text-xs text-ember">
                         Kiểm tra năng lực {mCap}: {statusVi[t.state] ?? t.state}
                         {t.mock ? ' (giả lập)' : ' (thật)'}
                         {t.error ? ` · ${errorCodeVi[t.error] ?? t.error}` : ''}
@@ -362,7 +362,7 @@ export function AiModelsPage() {
               <p className="text-[11px] text-muted">Số lớn hơn được chọn trước.</p>
             </div>
             {warnings.length > 0 ? (
-              <ul className="space-y-0.5 rounded-lg border border-[#6E4023] bg-[#221610] p-2.5 text-[12px] text-[#E8B04B]">
+              <ul className="space-y-0.5 rounded-lg border border-emberline bg-tint p-2.5 text-[12px] text-warn">
                 {warnings.map((w) => <li key={w}>{w}</li>)}
               </ul>
             ) : null}

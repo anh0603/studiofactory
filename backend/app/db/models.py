@@ -366,6 +366,7 @@ class AffiliateScript(Base):
     model: Mapped[str] = mapped_column(String(255), default="")
     request_id: Mapped[str] = mapped_column(String(64), default="")
     mock: Mapped[bool] = mapped_column(Boolean, default=False)
+    position: Mapped[int] = mapped_column(Integer, default=0)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
 
 

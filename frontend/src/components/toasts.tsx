@@ -14,7 +14,7 @@ export function Toasts() {
       {toasts.map((toast) => (
         <div
           key={toast.id}
-          className={`animate-toast-in rounded-xl border bg-[#141A21]/95 p-3 shadow-xl backdrop-blur ${tint[toast.kind] ?? tint.info}`}
+          className={`animate-toast-in rounded-xl border bg-chrome/95 p-3 shadow-xl backdrop-blur ${tint[toast.kind] ?? tint.info}`}
         >
           <div className="flex items-start justify-between gap-2">
             <p className="flex items-center gap-2 text-[13px] font-semibold text-ink">

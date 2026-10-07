@@ -59,7 +59,7 @@ export function AiRouterPage() {
             <div className="mt-2.5 rounded-lg bg-bg p-3 text-[13px]">
               {result.output ? <p className="text-ink">Kết quả: {result.output}</p> : null}
               {result.error ? (
-                <p className="text-[#F7A672]">
+                <p className="text-ember">
                   {errorCodeVi[result.error.code] ?? result.error.code}
                   <span className="mono ml-1 text-[11px] text-muted">{result.error.code}</span>
                 </p>
@@ -69,7 +69,7 @@ export function AiRouterPage() {
                 <ol className="space-y-1 text-xs text-secondary">
                   {result.trace.map((t) => (
                     <li key={t.attempt} className="flex flex-wrap gap-x-1.5 rounded border border-border px-2 py-1">
-                      <span className="mono text-[#F7A672]">#{t.attempt}</span>
+                      <span className="mono text-ember">#{t.attempt}</span>
                       <span>{t.provider}/{t.model}</span>
                       <span>{t.status}{t.error_code !== 'SUCCESS' ? ` ${t.error_code}` : ''}</span>
                       {t.fallback_reason ? <span className="text-muted">→ {t.fallback_reason}</span> : null}
@@ -90,7 +90,7 @@ export function AiRouterPage() {
             <div className="text-sm">
               <p className="mono mb-2 text-muted">Chiến lược áp dụng: {STRATEGIES[eligible.data.data.strategy_resolved] ?? eligible.data.data.strategy_resolved}</p>
               {eligible.data.data.eligible.length === 0 ? (
-                <div className="rounded-xl border border-dashed border-border bg-[#10141A] px-4 py-6 text-center">
+                <div className="rounded-xl border border-dashed border-border bg-panel px-4 py-6 text-center">
                   <p className="text-[13px] font-medium text-secondary">Chưa có model khả dụng</p>
                   <p className="mx-auto mt-1 max-w-md text-[12px] text-muted">
                     Không có mô hình nào vượt qua điều kiện: năng lực, khoá truy cập, lớp chi phí và giấy phép.

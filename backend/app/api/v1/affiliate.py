@@ -187,6 +187,7 @@ def _router_text(db, prompt: str, request_id: str, style: str = "AUTO",
         "name": m.name, "model_id": m.model_id, "capabilities": m.capabilities,
         "priority": m.priority, "enabled": m.enabled, "cost_class": m.cost_class,
         "license_status": m.license_status, "health_status": m.health_status,
+        "metadata": m.extra_metadata or {},
     } for m in db.scalars(select(M.AIModel)).all()]
     providers = {p.id: {"id": p.id, "name": p.name, "base_url": p.base_url,
                         "adapter_key": p.adapter_key, "enabled": p.enabled}
@@ -257,7 +258,7 @@ def _script_out(s: M.AffiliateScript) -> dict:
             "hook": s.hook, "body": s.body, "cta": s.cta,
             "disclosure": s.disclosure, "disclosure_injected": s.disclosure_injected,
             "provider": s.provider, "model": s.model, "request_id": s.request_id,
-            "mock": s.mock, "created_at": s.created_at}
+            "mock": s.mock, "position": s.position, "created_at": s.created_at}
 
 
 @router.post("/affiliate/products/{product_id}/scripts", status_code=201)
@@ -293,6 +294,12 @@ def create_script(product_id: str, body: ScriptIn, request: Request,
                           disclosure=disclosure, disclosure_injected=injected,
                           provider=provider, model=model, request_id=rid, mock=mock_any)
     db.add(s)
+    db.flush()
+    # New scripts go last: max sibling position + 1.
+    siblings = db.scalars(select(M.AffiliateScript).where(
+        M.AffiliateScript.product_id == p.id,
+        M.AffiliateScript.id != s.id)).all()
+    s.position = max([x.position for x in siblings], default=-1) + 1
     db.commit()
     return {"request_id": rid, "data": _script_out(s)}
 
@@ -303,8 +310,31 @@ def list_scripts(product_id: str, request: Request,
     _get_product(db, product_id)
     rows = db.scalars(select(M.AffiliateScript).where(
         M.AffiliateScript.product_id == product_id).order_by(
-            M.AffiliateScript.created_at)).all()
+            M.AffiliateScript.position, M.AffiliateScript.created_at)).all()
     return {"request_id": _rid(request), "data": [_script_out(s) for s in rows]}
+
+
+class ScriptPositionIn(BaseModel):
+    position: int = Field(ge=0, le=10000)
+
+
+@router.patch("/affiliate/scripts/{script_id}", status_code=200)
+def move_script(script_id: str, body: ScriptPositionIn, request: Request,
+                db: Session = Depends(get_db)) -> dict:
+    """Drag-and-drop reorder: move one script, renumber siblings 0..n."""
+    s = db.get(M.AffiliateScript, script_id)
+    if s is None:
+        raise AppError("NOT_FOUND", "Script not found.", 404)
+    siblings = db.scalars(select(M.AffiliateScript).where(
+        M.AffiliateScript.product_id == s.product_id,
+        M.AffiliateScript.id != s.id).order_by(
+            M.AffiliateScript.position, M.AffiliateScript.created_at)).all()
+    at = max(0, min(body.position, len(siblings)))
+    ordered = siblings[:at] + [s] + siblings[at:]
+    for i, row in enumerate(ordered):
+        row.position = i
+    db.commit()
+    return {"request_id": _rid(request), "data": _script_out(s)}
 
 
 # -------------------------------------------------------------------- videos
@@ -428,4 +458,14 @@ def export_video(video_id: str, request: Request,
     v.export_manifest = manifest
     v.status = "EXPORTED"
     db.commit()
-    return {"request_id": rid, "data": {"video_id": v.id, "manifest": manifest}}
+    from pathlib import Path as _Path
+    from .settings import copy_to_export_dir
+    items = [(storage.resolve_affiliate(p.id, rel), _Path(rel).name)]
+    if v.visual_artifact_id:
+        try:
+            items.append((storage.resolve_affiliate(p.id, v.visual_artifact_id),
+                          _Path(v.visual_artifact_id).name))
+        except Exception:  # noqa: BLE001 - export still succeeds, file skipped
+            pass
+    saved = copy_to_export_dir(db, items)
+    return {"request_id": rid, "data": {"video_id": v.id, "manifest": manifest, **saved}}

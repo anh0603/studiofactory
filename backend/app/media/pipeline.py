@@ -45,6 +45,7 @@ def _load_registry(db) -> tuple[list, dict, dict, set[str]]:
         "name": m.name, "model_id": m.model_id, "capabilities": m.capabilities,
         "priority": m.priority, "enabled": m.enabled, "cost_class": m.cost_class,
         "license_status": m.license_status, "health_status": m.health_status,
+        "metadata": m.extra_metadata or {},
     } for m in db.scalars(select(M.AIModel)).all()]
     providers = {p.id: {"id": p.id, "name": p.name, "base_url": p.base_url,
                         "adapter_key": p.adapter_key, "enabled": p.enabled}

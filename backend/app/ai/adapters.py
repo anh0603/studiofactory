@@ -5,6 +5,9 @@ Adapter kinds:
   Results are labeled mock=true and never count as live verification.
 - `openai_compatible`: real HTTPS adapter (OpenRouter/OpenAI/Together/Groq/
   custom OpenAI-compatible). Used only when a user credential exists.
+- `pollinations`: real HTTPS adapter for the keyless pollinations.ai free
+  image tier (flux-based). No secret. Models using it must be registered
+  with metadata {"keyless": true} so the router skips the credential gate.
 """
 from __future__ import annotations
 
@@ -75,12 +78,21 @@ class ProviderAdapter(ABC):
 
 # ---------------------------------------------------------------- SSRF guard
 
-_BLOCKED_HOSTS = ("localhost", "metadata.google.internal")
+_BLOCKED_HOSTS = ("metadata.google.internal",)
 _BLOCKED_SUFFIXES = (".local", ".internal", ".localhost")
+# Literal hostnames that always resolve to loopback.
+_LOOPBACK_HOSTS = ("localhost",)
 
 
 def validate_provider_url(base_url: str) -> str:
-    """Allow only public https/http hosts. Raises ValueError otherwise."""
+    """Allow public hosts plus operator-configured loopback gateways.
+
+    Local-first product (project.md #3): the operator pastes the provider URL
+    themselves, so 127.0.0.0/8, ::1 and the literal "localhost" are trusted
+    (local LLM gateways: Ollama, LM Studio, FreeLLMAPI, ...). Cloud metadata
+    endpoints, .local/.internal names and non-loopback private/LAN IPs stay
+    blocked. Raises ValueError otherwise.
+    """
     parsed = urlparse(base_url)
     if parsed.scheme not in ("https", "http"):
         raise ValueError("provider URL must be http(s)")
@@ -89,9 +101,13 @@ def validate_provider_url(base_url: str) -> str:
         raise ValueError("provider URL needs a host")
     if host in _BLOCKED_HOSTS or host.endswith(_BLOCKED_SUFFIXES):
         raise ValueError("provider host not allowed")
+    if host in _LOOPBACK_HOSTS:
+        return base_url.rstrip("/")
     try:
         ip = ipaddress.ip_address(host)
-        if ip.is_private or ip.is_loopback or ip.is_link_local or ip.is_reserved:
+        if ip.is_loopback:
+            return base_url.rstrip("/")
+        if ip.is_private or ip.is_link_local or ip.is_reserved:
             raise ValueError("provider IP not allowed")
     except ValueError as exc:
         # hostname (not IP): block metadata + resolve-time check happens per-request
@@ -166,7 +182,10 @@ class OpenAICompatibleAdapter(ProviderAdapter):
         body = _json.dumps({
             "model": request.model_id,
             "messages": [{"role": "user", "content": request.prompt}],
-            "max_tokens": 512,
+            # Structured outputs (Director Plan JSON) need headroom; a low cap
+            # truncates them mid-JSON into INVALID_RESPONSE. Vietnamese output
+            # is token-hungry, so allow up to 8k. Phase B.
+            "max_tokens": 8192,
         }).encode()
         req = urllib.request.Request(
             self.base_url + "/chat/completions", data=body,
@@ -251,8 +270,15 @@ class OpenAICompatibleAdapter(ProviderAdapter):
                 return AdapterResult(ok=True, output=f"data:image/png;base64,{b64}",
                                      latency_ms=int((time.monotonic() - started) * 1000))
             if kind == "TTS":
-                body = _json.dumps({"model": request.model_id, "input": request.prompt,
-                                    "voice": "alloy", "response_format": "wav"}).encode()
+                tts_body: dict = {"model": request.model_id, "input": request.prompt,
+                                  "response_format": "wav"}
+                # OpenAI voices (alloy, …) are rejected by other providers
+                # (e.g. Google Gemini TTS needs its own voice names). Only send
+                # an explicit voice for OpenAI tts-* models; otherwise let the
+                # gateway pick its default. Phase B8.
+                if (request.model_id or "").startswith("tts-"):
+                    tts_body["voice"] = "alloy"
+                body = _json.dumps(tts_body).encode()
                 raw = self._post_bytes("/audio/speech", body, secret, request.timeout_s)
                 import base64 as _b64
                 return AdapterResult(
@@ -302,6 +328,94 @@ class _AdapterHTTPError(Exception):
         self.body = body
 
 
+# ------------------------------------------- pollinations (keyless free image)
+
+class PollinationsAdapter(ProviderAdapter):
+    """Real image generation via the keyless pollinations.ai free tier.
+
+    No secret is used (anonymous free API, flux-based). Bytes are returned
+    as a data: URI; the media pipeline validates magic bytes/dimensions,
+    never trusting the adapter. TEXT/TTS/VIDEO report CAPABILITY_UNSUPPORTED.
+    """
+
+    DEFAULT_BASE = "https://image.pollinations.ai"
+
+    def __init__(self, base_url: str = ""):
+        self.base_url = (base_url or self.DEFAULT_BASE).rstrip("/")
+
+    def generate(self, request: AdapterRequest, secret: str) -> AdapterResult:
+        return AdapterResult(ok=False, error_code="CAPABILITY_UNSUPPORTED",
+                             error_message="pollinations adapter serves IMAGE only")
+
+    def test_capability(self, capability: str, model_id: str, secret: str) -> dict:
+        if capability != "IMAGE":
+            return {"state": "FAILED", "capability": capability,
+                    "checks": {"reachable": True, "authenticated": True,
+                               "capability_match": False},
+                    "note": "pollinations serves IMAGE only", "mock": False}
+        res = self.generate_media(
+            "IMAGE", AdapterRequest(task="TEST", capability="IMAGE",
+                                    prompt="small red circle on white",
+                                    model_id=model_id, timeout_s=120.0), "")
+        if not res.ok:
+            return {"state": "FAILED", "capability": capability,
+                    "error": res.error_code, "checks": {"reachable": False},
+                    "mock": False}
+        return {"state": "CAPABILITY_VERIFIED", "capability": capability,
+                "checks": {"reachable": True, "authenticated": True,
+                           "capability_match": True},
+                "note": "real tiny probe image generated", "mock": False}
+
+    def generate_media(self, kind: str, request: AdapterRequest,
+                       secret: str) -> AdapterResult:
+        import base64 as _b64
+        import random as _random
+        import urllib.parse as _parse
+
+        started = time.monotonic()
+        if kind != "IMAGE":
+            return AdapterResult(ok=False, error_code="CAPABILITY_UNSUPPORTED",
+                                 error_message=f"pollinations lacks {kind} support")
+        prompt = (request.prompt or "").strip()[:1500]
+        if not prompt:
+            return AdapterResult(ok=False, error_code="BAD_REQUEST",
+                                 error_message="empty image prompt")
+        url = (f"{self.base_url}/prompt/{_parse.quote(prompt)}"
+               f"?width=1024&height=1024&seed={_random.randint(0, 10**9)}"
+               f"&model=flux&nologo=true")
+        req = urllib.request.Request(url, method="GET",
+                                     headers={"Accept": "image/*"})
+        try:
+            with urllib.request.urlopen(req,
+                                        timeout=request.timeout_s) as resp:
+                ctype = resp.headers.get_content_type()
+                raw = resp.read()
+        except urllib.error.HTTPError as exc:  # type: ignore[attr-defined]
+            import urllib.error as _e
+            assert isinstance(exc, _e.HTTPError)
+            return AdapterResult(ok=False,
+                                 error_code=self.classify_http(exc.code, ""),
+                                 error_message=f"HTTP {exc.code}",
+                                 latency_ms=int((time.monotonic() - started) * 1000))
+        except TimeoutError:
+            return AdapterResult(ok=False, error_code="TIMEOUT",
+                                 error_message="timeout")
+        except Exception as exc:  # noqa: BLE001
+            return AdapterResult(ok=False, error_code="NETWORK_ERROR",
+                                 error_message=type(exc).__name__)
+        if not ctype.startswith("image/"):
+            return AdapterResult(ok=False, error_code="INVALID_RESPONSE",
+                                 error_message=f"unexpected content-type: {ctype}")
+        if not raw:
+            return AdapterResult(ok=False, error_code="INVALID_RESPONSE",
+                                 error_message="empty image body")
+        return AdapterResult(
+            ok=True,
+            output="data:" + ctype + ";base64," + _b64.b64encode(raw).decode(),
+            latency_ms=int((time.monotonic() - started) * 1000))
+        self.body = body
+
+
 _ADAPTERS: dict[str, ProviderAdapter] = {}
 
 
@@ -314,6 +428,8 @@ def get_adapter(provider: object, base_url: str = "") -> ProviderAdapter:
     key = getattr(provider, "adapter_key", "custom")
     if key in _ADAPTERS:
         return _ADAPTERS[key]
+    if key == "pollinations":
+        return PollinationsAdapter(base_url or PollinationsAdapter.DEFAULT_BASE)
     if key in ("openai_compatible", "openrouter", "openai", "together", "groq", "custom"):
         return OpenAICompatibleAdapter(base_url or "https://api.example.invalid")
     raise ValueError(f"no adapter for key: {key}")

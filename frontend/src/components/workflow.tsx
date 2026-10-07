@@ -57,13 +57,13 @@ export const STATE_LABEL: Record<StepState, string> = {
 }
 
 const NODE_TONE: Record<StepState, string> = {
-  COMPLETED: 'text-[#7BC8A4]',
+  COMPLETED: 'text-ok',
   RUNNING: 'text-accent',
-  REVIEW: 'text-[#E8B04B]',
-  BLOCKED: 'text-[#E07A6A]',
-  FAILED: 'text-[#E07A6A]',
+  REVIEW: 'text-warn',
+  BLOCKED: 'text-bad',
+  FAILED: 'text-bad',
   WAITING: 'text-muted',
-  UNAVAILABLE: 'text-[#4E5A6B]',
+  UNAVAILABLE: 'text-muted',
 }
 
 function Marker({ state }: { state: StepState }) {
@@ -111,7 +111,7 @@ export function WorkflowStrip({
                 className={[
                   'flex min-w-0 flex-1 cursor-pointer flex-col items-center gap-1 rounded-lg px-1 py-1.5 text-center',
                   'transition-colors duration-hover ease-out',
-                  isActive ? 'bg-[#1E2632]' : 'hover:bg-[#181E26]',
+                  isActive ? 'bg-elevated' : 'hover:bg-raised',
                 ].join(' ')}
               >
                 <span className={['flex items-center gap-1.5', isNext ? 'text-accent' : ''].join(' ')}>
@@ -138,7 +138,7 @@ export function WorkflowStrip({
                   aria-hidden="true"
                   className={[
                     'mx-0.5 h-px w-2 shrink-0 self-center transition-colors duration-state',
-                    done ? 'bg-[#4A6B5C]' : 'bg-border',
+                    done ? 'bg-ok' : 'bg-border',
                   ].join(' ')}
                 />
               ) : null}
@@ -166,7 +166,7 @@ export function WorkflowStepper({
         <p className="text-[11px] font-bold uppercase tracking-[0.09em] text-secondary">Quy trình</p>
         <p className="mono text-[11px] text-secondary">{completed} / {nodes.length}</p>
       </div>
-      <div className="mt-1.5 h-1 overflow-hidden rounded-full bg-[#10141A]">
+      <div className="mt-1.5 h-1 overflow-hidden rounded-full bg-panel">
         <div
           className="h-full rounded-full bg-accent transition-[width] duration-state ease-out"
           style={{ width: `${nodes.length ? (completed / nodes.length) * 100 : 0}%` }}
@@ -187,7 +187,7 @@ export function WorkflowStepper({
                 onClick={() => onSelect?.(n.id)}
                 className={[
                   'flex w-full items-center gap-2.5 rounded-lg px-2 py-1.5 text-left transition-colors duration-hover ease-out',
-                  isActive ? 'bg-[#1E2632]' : 'hover:bg-[#181E26]',
+                  isActive ? 'bg-elevated' : 'hover:bg-raised',
                 ].join(' ')}
               >
                 <Icon className={['h-4 w-4 shrink-0', isActive || isNext ? 'text-accent' : NODE_TONE[n.state]].join(' ')} />

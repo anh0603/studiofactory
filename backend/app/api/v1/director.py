@@ -60,6 +60,7 @@ def _route_for_director(db: Session, prompt: str, strategy: str,
         "name": m.name, "model_id": m.model_id, "capabilities": m.capabilities,
         "priority": m.priority, "enabled": m.enabled, "cost_class": m.cost_class,
         "license_status": m.license_status, "health_status": m.health_status,
+        "metadata": m.extra_metadata or {},
     } for m in db.scalars(select(M.AIModel)).all()]
     providers = {p.id: {"id": p.id, "name": p.name, "base_url": p.base_url,
                         "adapter_key": p.adapter_key, "enabled": p.enabled}
@@ -71,13 +72,20 @@ def _route_for_director(db: Session, prompt: str, strategy: str,
         task="STORY_GENERATION", capability="STORY", prompt=prompt,
         strategy=strategy, allow_paid=allow_paid,
         require_commercial=require_commercial, manual_model_id=manual_model_id,
-        max_attempts=3), request_id)
+        max_attempts=3,
+        # Director plans are long structured outputs; the 20s default would
+        # time out slow free-tier models mid-plan. Phase B.
+        timeout_s=120.0), request_id)
     # Record every user-triggered operation: per-attempt traces when a provider
     # was contacted, or one pre-network BLOCKED row when gates refused it.
     from ...ai.usage import record_routing
     mock_any = record_routing(db, request_id=request_id, task="STORY_GENERATION",
                               capability="STORY", result=result,
                               providers=providers, models=models)
+    # Commit traces immediately: generate_plan may raise INVALID_RESPONSE after
+    # this (malformed plan), and the request teardown would roll back the
+    # uncommitted routing rows, losing all observability. Phase B.
+    db.commit()
     if not result.ok and not result.attempts:
         # Commit the BLOCKED activity row before the request rolls back, otherwise
         # a refused generation leaves no trace at all (PASS 8 fix).

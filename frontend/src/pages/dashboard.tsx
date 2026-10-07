@@ -1,9 +1,10 @@
 import { useQuery } from '@tanstack/react-query'
+import { CalendarClock, Clapperboard, Film, FolderKanban, ListVideo, ShoppingCart } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { api } from '../api/client'
 import type { Project } from '../api/client'
 import { ErrorState } from '../components/states'
-import { Card, SkeletonList, StatusBadge } from '../components/ui'
+import { Card, SkeletonList, Stat, StatusBadge } from '../components/ui'
 import { labelVi } from '../i18n/strings.vi'
 
 type CheckState = { status: string; detail?: string }
@@ -47,9 +48,14 @@ function ProjectRow({ p }: { p: Project }) {
     <li>
       <Link
         to={isAffiliate ? '/affiliate' : `/story/${p.id}`}
-        className="row-item row-item-hover flex items-center justify-between gap-3 !py-3"
+        className="row-item row-item-hover group flex items-center gap-3 !py-3"
       >
-        <div className="min-w-0">
+        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-border bg-panel text-secondary transition-colors duration-hover group-hover:border-ink/30 group-hover:text-accent" aria-hidden="true">
+          {isAffiliate
+            ? <ShoppingCart className="h-[18px] w-[18px]" />
+            : <Clapperboard className="h-[18px] w-[18px]" />}
+        </span>
+        <div className="min-w-0 flex-1">
           <p className="truncate text-sm font-semibold">{p.name}</p>
           <p className="mt-0.5 truncate text-xs text-secondary">
             {isAffiliate ? 'Affiliate Factory' : 'Story Factory'}
@@ -88,27 +94,33 @@ export function DashboardPage() {
   return (
     <div className="space-y-6">
       {/* Hero — the factory itself, not a prompt box. */}
-      <section className="card !p-6">
-        <p className="text-[11px] font-bold uppercase tracking-[0.1em] text-[#8492A5]">AI Video Factory</p>
-        <h1 className="mt-2 text-[26px] font-bold leading-tight tracking-tight">
+      <section className="card hero-panel !p-6 md:!p-8">
+        <p className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.12em] text-secondary">
+          <span className="h-1.5 w-1.5 animate-dot-pulse rounded-full bg-accent" aria-hidden="true" />
+          AI Video Factory
+        </p>
+        <h1 className="mt-3 max-w-2xl text-[26px] font-extrabold leading-tight tracking-tight md:text-[30px]">
           Từ ý tưởng đến video đã đăng — tự động hoá toàn bộ.
         </h1>
         <p className="mt-2 max-w-3xl text-[13px] leading-relaxed text-secondary">
           Một dự án đi qua đủ chuỗi bước có kiểm soát. Bạn duyệt ở những cổng quyết định, phần còn lại nhà máy chạy.
         </p>
 
-        <ol className="mt-4 flex flex-wrap items-center gap-x-1.5 gap-y-1.5" aria-label="Chuỗi sản xuất">
+        <ol className="mt-5 flex flex-wrap items-center gap-y-2" aria-label="Chuỗi sản xuất">
           {PIPELINE.map((step, i) => (
-            <li key={step} className="flex items-center gap-1.5">
-              <span className="rounded-md border border-border bg-bg px-2 py-1 text-[11px] font-medium text-secondary">
+            <li key={step} className="flex items-center">
+              <span className="flex items-center gap-1.5 rounded-lg border border-border bg-panel/80 py-1 pl-1.5 pr-2 text-[11px] font-semibold text-secondary">
+                <span className="flex h-4 w-4 items-center justify-center rounded bg-elevated font-mono text-[9px] font-bold text-accent">
+                  {i + 1}
+                </span>
                 {step}
               </span>
-              {i < PIPELINE.length - 1 ? <span aria-hidden="true" className="text-muted">→</span> : null}
+              {i < PIPELINE.length - 1 ? <span aria-hidden="true" className="mx-1 text-muted">→</span> : null}
             </li>
           ))}
         </ol>
 
-        <div className="mt-5 flex flex-wrap gap-2.5">
+        <div className="mt-6 flex flex-wrap gap-2.5">
           <Link to="/story" className="btn btn-accent">+ Tạo Story</Link>
           <Link to="/affiliate" className="btn btn-ghost">+ Tạo Affiliate Video</Link>
         </div>
@@ -116,32 +128,30 @@ export function DashboardPage() {
 
       {/* Real counts only. */}
       <div className="grid-4">
-        <Card>
-          <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-secondary">Dự án</p>
-          <p className="mt-1.5 text-[22px] font-bold leading-none">
-            {projects.data ? projects.data.data.length : '…'}
-          </p>
-          <p className="mt-1.5 text-[11px] text-muted">đang có trong nhà máy</p>
-        </Card>
-        <Card>
-          <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-secondary">Video đã dựng</p>
-          <p className="mt-1.5 text-[22px] font-bold leading-none">{prod ? Number(prod.videos) : '…'}</p>
-          <p className="mt-1.5 text-[11px] text-muted">{prod ? `${Number(prod.exports)} đã xuất tệp` : ''}</p>
-        </Card>
-        <Card>
-          <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-secondary">Hàng đợi</p>
-          <p className="mt-1.5 text-[22px] font-bold leading-none">{jobs.data ? activeJobs : '…'}</p>
-          <p className="mt-1.5 text-[11px] text-muted">
-            {jobs.data ? (failedJobs > 0 ? `${failedJobs} tác vụ lỗi` : 'tác vụ đang chờ hoặc chạy') : ''}
-          </p>
-        </Card>
-        <Card>
-          <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-secondary">Lịch đăng</p>
-          <p className="mt-1.5 text-[22px] font-bold leading-none">{automation ? automation.scheduled : '…'}</p>
-          <p className="mt-1.5 text-[11px] text-muted">
-            {publishing ? `${publishing.confirmed} video đã đăng` : ''}
-          </p>
-        </Card>
+        <Stat
+          label="Dự án"
+          value={projects.data ? projects.data.data.length : '…'}
+          sub="đang có trong nhà máy"
+          icon={<FolderKanban className="h-4 w-4" aria-hidden="true" />}
+        />
+        <Stat
+          label="Video đã dựng"
+          value={prod ? Number(prod.videos) : '…'}
+          sub={prod ? `${Number(prod.exports)} đã xuất tệp` : ''}
+          icon={<Film className="h-4 w-4" aria-hidden="true" />}
+        />
+        <Stat
+          label="Hàng đợi"
+          value={jobs.data ? activeJobs : '…'}
+          sub={jobs.data ? (failedJobs > 0 ? `${failedJobs} tác vụ lỗi` : 'tác vụ đang chờ hoặc chạy') : ''}
+          icon={<ListVideo className="h-4 w-4" aria-hidden="true" />}
+        />
+        <Stat
+          label="Lịch đăng"
+          value={automation ? automation.scheduled : '…'}
+          sub={publishing ? `${publishing.confirmed} video đã đăng` : ''}
+          icon={<CalendarClock className="h-4 w-4" aria-hidden="true" />}
+        />
       </div>
 
       <div className="grid items-start gap-4 lg:grid-cols-5">
@@ -200,7 +210,7 @@ export function DashboardPage() {
                     {ok ? (
                       <span className="text-[13px] text-secondary">{c.ready}</span>
                     ) : (
-                      <Link to={c.to} className="flex items-center gap-1.5 text-[13px] text-[#F7A672] hover:underline">
+                      <Link to={c.to} className="flex items-center gap-1.5 text-[13px] text-ember hover:underline">
                         {c.needsSetup}
                         <span aria-hidden="true">·</span>
                         {c.cta}

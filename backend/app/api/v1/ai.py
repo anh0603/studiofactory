@@ -24,7 +24,7 @@ from ...db.session import get_db
 
 router = APIRouter(prefix="/ai")
 
-ADAPTER_KEYS = ("openai_compatible", "openrouter", "openai", "together", "groq", "custom", "test")
+ADAPTER_KEYS = ("openai_compatible", "openrouter", "openai", "together", "groq", "custom", "test", "pollinations")
 CAPABILITIES = ("TEXT", "STORY", "VISION", "IMAGE", "VIDEO", "TTS", "MUSIC", "SFX", "EMBEDDING")
 COST_CLASSES = ("LOCAL", "FREE", "FREE_WITH_LIMIT", "TRIAL", "PAID", "UNKNOWN")
 LICENSES = ("VERIFIED_COMMERCIAL", "VERIFIED_NONCOMMERCIAL", "UNKNOWN", "UNVERIFIED")
@@ -283,11 +283,13 @@ def test_model(model_id: str, body: TestIn, request: Request,
     if body.capability not in CAPABILITIES:
         raise AppError("BAD_REQUEST", "unknown capability", 400)
     provider = db.get(M.AIProvider, m.provider_id)
-    cred = db.scalar(select(M.Credential).where(M.Credential.ref == m.credential_ref))
-    if cred is None or not store().exists(m.credential_ref):
+    keyless = ((m.extra_metadata or {}).get("keyless") is True)
+    cred = None if keyless else db.scalar(
+        select(M.Credential).where(M.Credential.ref == m.credential_ref))
+    if not keyless and (cred is None or not store().exists(m.credential_ref)):
         return {"request_id": rid, "data": {"state": "FAILED", "error": "CREDENTIAL_MISSING",
                                             "checks": {"reachable": False, "authenticated": False}}}
-    secret = store().get(m.credential_ref)
+    secret = "" if keyless else store().get(m.credential_ref)
     try:
         adapter = get_adapter(_Obj(provider), provider.base_url if provider else "")
     except ValueError:

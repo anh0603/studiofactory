@@ -80,7 +80,7 @@ function ArtifactList({
       <h2 className="section-title">{title}</h2>
       {hint ? <p className="mt-0.5 text-[13px] text-secondary">{hint}</p> : null}
       {artifacts.length === 0 ? (
-        <div className="mt-3 rounded-xl border border-dashed border-border bg-[#10141A] px-4 py-6 text-center">
+        <div className="mt-3 rounded-xl border border-dashed border-border bg-panel px-4 py-6 text-center">
           <p className="text-[13px] font-medium text-secondary">{emptyTitle}</p>
           {emptyHint ? <p className="mt-1 text-[12px] text-muted">{emptyHint}</p> : null}
         </div>
@@ -221,7 +221,7 @@ function IdeaWs({ p, onStep, saveProject, saveProjectPending, saveProjectError, 
           </>
         ) : (
           <>
-            <p className="text-[13px] text-[#E8B04B]">Vui lòng nhập ý tưởng trước.</p>
+            <p className="text-[13px] text-warn">Vui lòng nhập ý tưởng trước.</p>
             <p className="mt-1 text-[13px] text-secondary">
               Mô tả càng rõ (nhân vật, bối cảnh, điều muốn xảy ra), kịch bản càng sát ý bạn.
             </p>
@@ -273,7 +273,7 @@ function DirectorWs({
             </Btn>
           </div>
         </div>
-        {!idea.trim() ? <p className="mt-2 text-[13px] text-[#E8B04B]">Vui lòng nhập ý tưởng trước.</p> : null}
+        {!idea.trim() ? <p className="mt-2 text-[13px] text-warn">Vui lòng nhập ý tưởng trước.</p> : null}
         {planPending ? <div className="mt-3"><ProgressNote text="AI đang viết kịch bản…" /></div> : null}
         {planError ? (
           <div className="mt-3">
@@ -306,7 +306,7 @@ function DirectorWs({
                   className={[
                     'rounded-full border px-2.5 py-1 text-[12px] font-semibold transition-colors duration-hover',
                     (viewing?.id ?? '') === v.id
-                      ? 'border-[#7A4520] bg-[#2B1A10] text-[#F7A672]'
+                      ? 'border-emberline bg-tint text-ember'
                       : 'border-border bg-surface text-secondary hover:text-ink',
                   ].join(' ')}
                 >
@@ -317,7 +317,7 @@ function DirectorWs({
           ) : null}
 
           {isStale ? (
-            <p className="rounded-lg border border-[#7A4520] bg-[#221610] px-3 py-2 text-[13px] text-[#F7A672]">
+            <p className="rounded-lg border border-emberline bg-tint px-3 py-2 text-[13px] text-ember">
               Bản này đã cũ. Phiên bản mới nhất (v{latest!.version}) đang chờ duyệt.
             </p>
           ) : null}
@@ -359,13 +359,13 @@ function PlanBody({
       ) : (
         <h3 className="mt-2 text-lg font-bold tracking-tight">{p.title}</h3>
       )}
-      {p.hook ? <p className="mt-2 rounded-lg border-l-2 border-[#F2793C] bg-bg px-3 py-2 text-[13px] text-secondary">Mở đầu: {p.hook}</p> : null}
+      {p.hook ? <p className="mt-2 rounded-lg border-l-2 border-accent bg-bg px-3 py-2 text-[13px] text-secondary">Mở đầu: {p.hook}</p> : null}
       {p.concept ? <p className="mt-2 text-[13px]">Ý tưởng chính: {p.concept}</p> : null}
       {p.scenes && p.scenes.length > 0 ? (
         <ol className="mt-3 space-y-1.5">
           {p.scenes.map((s) => (
             <li key={s.scene_number} className="flex gap-2.5 rounded-lg border border-border bg-bg px-3 py-2 text-[13px]">
-              <span className="mono mt-0.5 shrink-0 text-[#F7A672]">{String(s.scene_number).padStart(2, '0')}</span>
+              <span className="mono mt-0.5 shrink-0 text-ember">{String(s.scene_number).padStart(2, '0')}</span>
               <span>
                 {s.description ?? '(chưa có mô tả)'}
                 {s.dialogue ? <span className="text-secondary"> · “{s.dialogue}”</span> : null}
@@ -434,7 +434,7 @@ function ScenesWs({
       <Card>
         <h2 className="section-title">Cảnh ({scenes.length})</h2>
         {scenes.length === 0 ? (
-          <div className="mt-3 rounded-xl border border-dashed border-border bg-[#10141A] px-4 py-6 text-center">
+          <div className="mt-3 rounded-xl border border-dashed border-border bg-panel px-4 py-6 text-center">
             <p className="text-[13px] font-medium text-secondary">Chưa có cảnh.</p>
             <p className="mt-1.5 text-[13px] text-muted">
               Duyệt kế hoạch không tự sinh cảnh. Bạn có thể tạo thủ công, hoặc bật Auto Pilot để nhà máy tạo tự động.
@@ -454,7 +454,7 @@ function ScenesWs({
                   <div className="flex flex-wrap items-start justify-between gap-2">
                     <div className="min-w-0">
                       <p className="text-sm">
-                        <span className="mono mr-1.5 text-[#F7A672]">#{s.order}</span>
+                        <span className="mono mr-1.5 text-ember">#{s.order}</span>
                         {s.description || '(chưa có mô tả)'}
                       </p>
                       {s.dialogue ? <p className="mt-1 text-[13px] text-secondary">“{s.dialogue}”</p> : null}
@@ -552,7 +552,7 @@ function QcWs({ qc, qcPending, qcError, runQc }: Pick<WorkspaceProps, 'qc' | 'qc
               <li key={c.key} className="flex items-start gap-2 border-b border-border/50 py-1 text-[13px] last:border-0">
                 <span className={[
                   'mt-0.5 w-3 shrink-0 text-[11px]',
-                  c.status === 'PASS' ? 'text-[#7BC8A4]' : c.status === 'REVIEW' ? 'text-[#E8B04B]' : 'text-[#E07A6A]',
+                  c.status === 'PASS' ? 'text-ok' : c.status === 'REVIEW' ? 'text-warn' : 'text-bad',
                 ].join(' ')}>
                   {c.status === 'PASS' ? '✓' : c.status === 'REVIEW' ? '⚠' : '✕'}
                 </span>
@@ -604,7 +604,7 @@ function GateWs({
             </div>
             {!passed ? (
               <div className="mt-3">
-                <p className="text-[13px] font-medium text-[#E8B04B]">Cổng sản xuất chưa đạt</p>
+                <p className="text-[13px] font-medium text-warn">Cổng sản xuất chưa đạt</p>
                 <ul className="mt-1.5 space-y-0.5 text-[13px] text-secondary">
                   {qc.gate.reasons.map((r, i) => <li key={i} className="mono">✕ {r}</li>)}
                 </ul>

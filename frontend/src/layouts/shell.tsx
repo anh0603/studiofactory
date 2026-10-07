@@ -1,21 +1,27 @@
+import { Kbd } from '@heroui/react'
+import { useQuery } from '@tanstack/react-query'
 import {
   Activity,
   BookOpen,
   CalendarClock,
   ChartColumn,
+  Clapperboard,
   Cpu,
   LayoutDashboard,
   ListVideo,
   Play,
   Route,
+  Search,
   Send,
   Settings,
   ShoppingCart,
 } from 'lucide-react'
-import { NavLink, Outlet, useLocation } from 'react-router-dom'
+import { Link, NavLink, Outlet, useLocation } from 'react-router-dom'
+import { api } from '../api/client'
 import { CommandPalette } from '../components/palette'
 import { Toasts } from '../components/toasts'
-import { t } from '../i18n/strings.vi'
+import { statusVi, t } from '../i18n/strings.vi'
+import { useUi } from '../stores/ui'
 
 type IconProps = { className?: string }
 
@@ -93,11 +99,11 @@ function Item({ to, label, icon: Icon, end }: NavItem) {
       to={to}
       end={end}
       className={({ isActive }) =>
-        `group relative flex items-center gap-3 rounded-lg px-3 py-2 text-[14px] leading-5 ` +
+        `group relative flex items-center gap-3 rounded-xl px-3 py-2 text-[14px] leading-5 ` +
         `transition-[background-color,color] duration-hover ease-out ` +
         (isActive
-          ? 'bg-[#242C36] font-semibold text-white'
-          : 'font-medium text-secondary hover:bg-[#1A2028] hover:text-ink')
+          ? 'bg-elevated font-semibold text-ink shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]'
+          : 'font-medium text-secondary hover:bg-raised hover:text-ink')
       }
     >
       {({ isActive }) => (
@@ -105,7 +111,7 @@ function Item({ to, label, icon: Icon, end }: NavItem) {
           <span
             aria-hidden="true"
             className={
-              'absolute left-0 top-1/2 h-4 w-[2px] -translate-y-1/2 rounded-r bg-accent ' +
+              'absolute left-0 top-1/2 h-5 w-[3px] -translate-y-1/2 rounded-r-full bg-accent ' +
               'transition-opacity duration-hover ease-out ' +
               (isActive ? 'opacity-100' : 'opacity-0')
             }
@@ -113,7 +119,7 @@ function Item({ to, label, icon: Icon, end }: NavItem) {
           <Icon
             className={
               'h-[18px] w-[18px] shrink-0 transition-colors duration-hover ease-out ' +
-              (isActive ? 'text-accent' : 'text-[#7D8A9C] group-hover:text-secondary')
+              (isActive ? 'text-accent' : 'text-muted group-hover:text-secondary')
             }
           />
           <span className="truncate">{label}</span>
@@ -123,8 +129,36 @@ function Item({ to, label, icon: Icon, end }: NavItem) {
   )
 }
 
+/** Real backend liveness for the top bar. Silent on failure — never fake. */
+function SystemPill() {
+  const diag = useQuery({
+    queryKey: ['diag-shell'],
+    queryFn: api.diagnostics,
+    staleTime: 30000,
+    refetchInterval: 30000,
+    retry: 1,
+    refetchOnWindowFocus: false,
+  })
+  const state = diag.data?.checks?.backend?.status
+  const tone = state === 'HEALTHY' ? 'bg-emerald-400' : state ? 'bg-amber-400' : 'bg-muted'
+  const pulse = state === 'HEALTHY' ? 'animate-dot-pulse' : ''
+  return (
+    <Link
+      to="/diagnostics"
+      title={t('nav.diagnostics')}
+      className="flex shrink-0 items-center gap-2 rounded-full border border-border bg-panel py-1 pl-2.5 pr-3 transition-colors duration-hover hover:border-ink/30"
+    >
+      <span className={`h-2 w-2 rounded-full ${tone} ${pulse}`} aria-hidden="true" />
+      <span className="hidden text-[12px] font-semibold text-secondary lg:inline">
+        {state === 'HEALTHY' ? statusVi.HEALTHY : '…'}
+      </span>
+    </Link>
+  )
+}
+
 export function Shell() {
   const { pathname } = useLocation()
+  const setPalette = useUi((s) => s.setPalette)
   const crumbs: Record<string, string> = {
     '/': t('nav.dashboard'),
     '/story': t('nav.story'),
@@ -147,15 +181,17 @@ export function Shell() {
 
   return (
     <div className="flex min-h-screen bg-bg text-ink">
-      <aside className="sticky top-0 hidden h-screen w-64 shrink-0 flex-col border-r border-border bg-surface md:flex" aria-label={t('nav.sidebar')}>
-        <div className="flex items-center gap-3 border-b border-border px-4 py-4">
-          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-accent text-base font-black text-[#1A0E07]">S</span>
+      <aside className="sticky top-0 hidden h-screen w-[248px] shrink-0 flex-col border-r border-border bg-chrome md:flex" aria-label={t('nav.sidebar')}>
+        <div className="flex items-center gap-3 px-4 pb-4 pt-5">
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-[#F2793C] to-[#B34A1E] text-[#1A0E07] shadow-[0_4px_16px_-4px_rgba(242,121,60,0.5)]">
+            <Clapperboard className="h-5 w-5" strokeWidth={2.2} aria-hidden="true" />
+          </span>
           <div className="min-w-0 leading-tight">
-            <p className="truncate text-[15px] font-bold text-ink">{t('app.title')}</p>
+            <p className="truncate text-[15px] font-extrabold tracking-tight text-ink">{t('app.title')}</p>
             <p className="truncate text-[11px] font-medium text-secondary">{t('app.subtitle')}</p>
           </div>
         </div>
-        <nav className="flex-1 space-y-4 overflow-y-auto px-3 py-4">
+        <nav className="flex-1 space-y-4 overflow-y-auto px-3 py-2">
           {NAV.map((g) => (
             <section key={g.group}>
               <p className="section-label mb-1.5">{g.group}</p>
@@ -165,15 +201,20 @@ export function Shell() {
             </section>
           ))}
         </nav>
-        <div className="border-t border-border p-3">
-          <p className="rounded-lg bg-[#1A2028] px-3 py-2 text-[11px] leading-relaxed text-secondary">
-            {t('nav.hint')} <kbd className="rounded border border-border bg-[#242C36] px-1 font-mono text-[10px] font-semibold text-ink">Ctrl K</kbd> {t('nav.hint.kbd')}
-          </p>
+        <div className="border-t border-border/70 p-3">
+          <button
+            onClick={() => setPalette(true)}
+            className="flex w-full items-center gap-2 rounded-lg bg-raised px-3 py-2 text-left text-[11px] leading-relaxed text-secondary transition-colors duration-hover hover:bg-elevated hover:text-ink"
+          >
+            <Search className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+            <span className="flex-1 truncate">{t('nav.hint')}</span>
+            <Kbd className="bg-elevated font-mono text-[10px]">K</Kbd>
+          </button>
         </div>
       </aside>
 
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="sticky top-0 z-10 border-b border-border bg-surface/95 px-4 py-3 backdrop-blur md:px-6">
+        <header className="sticky top-0 z-10 border-b border-border bg-chrome/90 px-4 py-3 backdrop-blur-md md:px-6">
           <div className="flex items-center justify-between gap-3">
             <p className="flex min-w-0 items-center gap-1.5 text-[13px]">
               <span className="truncate font-medium text-secondary">{t('app.title')}</span>
@@ -184,10 +225,20 @@ export function Shell() {
                 </>
               ) : null}
             </p>
-            <p className="hidden shrink-0 items-center gap-1.5 text-[11px] font-medium text-secondary sm:flex">
-              <kbd className="rounded border border-border bg-[#1A2028] px-1.5 py-0.5 font-mono text-[10px] font-semibold text-ink">Ctrl</kbd>
-              <kbd className="rounded border border-border bg-[#1A2028] px-1.5 py-0.5 font-mono text-[10px] font-semibold text-ink">K</kbd>
-            </p>
+            <div className="flex shrink-0 items-center gap-2">
+              <button
+                onClick={() => setPalette(true)}
+                aria-label="Ctrl K"
+                className="flex items-center gap-1.5 rounded-full border border-border bg-panel px-2.5 py-1 text-secondary transition-colors duration-hover hover:border-ink/30 hover:text-ink md:hidden"
+              >
+                <Search className="h-3.5 w-3.5" aria-hidden="true" />
+              </button>
+              <SystemPill />
+              <p className="hidden shrink-0 items-center gap-1 text-[11px] font-medium text-secondary sm:flex">
+                <Kbd className="bg-raised font-mono text-[10px]">Ctrl</Kbd>
+                <Kbd className="bg-raised font-mono text-[10px]">K</Kbd>
+              </p>
+            </div>
           </div>
           <nav className="-mb-1 mt-2 flex gap-1 overflow-x-auto md:hidden" aria-label={t('nav.sidebar')}>
             {NAV.flatMap((g) => g.items).map((it) => (
@@ -198,7 +249,7 @@ export function Shell() {
                 className={({ isActive }) =>
                   `shrink-0 rounded-full px-3 py-1 text-[13px] font-medium ` +
                   `transition-colors duration-hover ease-out ` +
-                  (isActive ? 'bg-[#242C36] font-semibold text-white' : 'text-secondary hover:bg-[#1A2028] hover:text-ink')
+                  (isActive ? 'bg-elevated font-semibold text-ink' : 'text-secondary hover:bg-raised hover:text-ink')
                 }
               >
                 {it.label}

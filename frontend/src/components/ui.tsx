@@ -1,8 +1,9 @@
+import { Button as HeroButton, Skeleton as HeroSkeleton, Spinner as HeroSpinner } from '@heroui/react'
 import { forwardRef } from 'react'
 import type { ButtonHTMLAttributes, InputHTMLAttributes, SelectHTMLAttributes } from 'react'
 import { statusVi } from '../i18n/strings.vi'
 
-/* Shared design primitives. Visual only — no API logic here. */
+/* Shared design primitives. Same props/API as before — visual layer only. */
 
 const STATUS_BADGE: Record<string, string> = {
   SUCCEEDED: 'badge-ok', CONFIRMED_PUBLISHED: 'badge-ok', PASS: 'badge-ok',
@@ -16,6 +17,7 @@ const STATUS_BADGE: Record<string, string> = {
   FAILED: 'badge-bad', BLOCKED: 'badge-bad', FATAL_ERROR: 'badge-bad',
   CANCELLED: 'badge-bad', REJECTED: 'badge-bad', UNAVAILABLE: 'badge-bad',
   AUTH_FAILED: 'badge-bad', NOT_CONNECTED: 'badge-bad',
+  NOT_RUNNING: 'badge-bad', ERROR: 'badge-bad',
 }
 
 /** Only real in-flight states pulse. Everything else stays still. */
@@ -58,24 +60,40 @@ type BtnProps = ButtonHTMLAttributes<HTMLButtonElement> & {
   busy?: boolean
 }
 
-export function Btn({ variant = 'ghost', size = 'md', className = '', children, busy, ...rest }: BtnProps) {
+export function Btn({ variant = 'ghost', size = 'md', className = '', children, busy, disabled, onClick, type, title }: BtnProps) {
   if (variant === 'link') {
     return (
-      <button
-        className={`link-accent text-[13px] transition-colors duration-hover ${className}`}
-        {...rest}
+      <HeroButton
+        variant="light"
+        color="primary"
+        size={size === 'sm' ? 'sm' : 'md'}
+        isLoading={busy || undefined}
+        isDisabled={disabled || undefined}
+        onClick={onClick as never}
+        type={type}
+        title={title}
+        className={`h-auto min-w-0 gap-1 px-1.5 py-1 text-[13px] font-semibold ${className}`}
       >
         {children}
-      </button>
+      </HeroButton>
     )
   }
-  const v = variant === 'accent' ? 'btn-accent' : variant === 'danger' ? 'btn-danger-ghost' : 'btn-ghost'
-  const s = size === 'sm' ? 'px-2.5 py-1 text-[13px]' : ''
+  const color = variant === 'accent' ? 'primary' : variant === 'danger' ? 'danger' : 'default'
+  const heroVariant = variant === 'accent' ? 'shadow' : 'bordered'
   return (
-    <button className={`btn ${v} ${s} ${className}`} aria-busy={busy || undefined} {...rest}>
-      {busy ? <SpinnerSm /> : null}
+    <HeroButton
+      color={color as never}
+      variant={heroVariant as never}
+      size={size === 'sm' ? 'sm' : 'md'}
+      isLoading={busy || undefined}
+      isDisabled={disabled || undefined}
+      onClick={onClick as never}
+      type={type}
+      title={title}
+      className={`font-semibold ${variant === 'ghost' ? 'border-border bg-raised text-ink' : ''} ${className}`}
+    >
       {children}
-    </button>
+    </HeroButton>
   )
 }
 
@@ -96,20 +114,23 @@ export function Select(props: SelectHTMLAttributes<HTMLSelectElement>) {
 export function PageHeader({ title, sub, actions }: { title: string; sub?: string; actions?: React.ReactNode }) {
   return (
     <div className="page-head">
-      <div>
+      <div className="min-w-0">
         <h1 className="page-title">{title}</h1>
         {sub ? <p className="page-sub">{sub}</p> : null}
       </div>
-      {actions ? <div className="flex flex-wrap items-center gap-2">{actions}</div> : null}
+      {actions ? <div className="flex shrink-0 flex-wrap items-center gap-2">{actions}</div> : null}
     </div>
   )
 }
 
-export function Stat({ label, value, sub }: { label: string; value: React.ReactNode; sub?: string }) {
+export function Stat({ label, value, sub, icon }: { label: string; value: React.ReactNode; sub?: string; icon?: React.ReactNode }) {
   return (
-    <div className="card">
-      <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-secondary">{label}</p>
-      <p className="mt-1 text-[22px] font-bold leading-none">{value}</p>
+    <div className="card group">
+      <div className="flex items-start justify-between gap-2">
+        <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-secondary">{label}</p>
+        {icon ? <span className="stat-ic">{icon}</span> : null}
+      </div>
+      <p className="mt-1.5 text-[26px] font-extrabold leading-none tracking-tight">{value}</p>
       {sub ? <p className="mono mt-1.5 text-muted">{sub}</p> : null}
     </div>
   )
@@ -118,16 +139,15 @@ export function Stat({ label, value, sub }: { label: string; value: React.ReactN
 /** Inline spinner. Only for short actions and small requests. */
 export function SpinnerSm({ className = '' }: { className?: string }) {
   return (
-    <span
-      aria-hidden="true"
-      className={`h-3.5 w-3.5 shrink-0 animate-spin rounded-full border-2 border-current/30 border-t-current ${className}`}
-    />
+    <span className={`inline-flex shrink-0 ${className}`} aria-hidden="true">
+      <HeroSpinner size="sm" color="current" />
+    </span>
   )
 }
 
 /** Skeleton block. Preferred over a full-area spinner. */
 export function Skeleton({ className = '' }: { className?: string }) {
-  return <div aria-hidden="true" className={`skeleton ${className}`} />
+  return <HeroSkeleton className={`rounded-lg ${className}`} />
 }
 
 export function SkeletonList({ rows = 3, className = '' }: { rows?: number; className?: string }) {
@@ -143,7 +163,7 @@ export function SkeletonList({ rows = 3, className = '' }: { rows?: number; clas
 export function Spinner({ label }: { label?: string }) {
   return (
     <div role="status" className="flex items-center gap-2.5 py-6 text-secondary">
-      <SpinnerSm />
+      <HeroSpinner size="sm" color="current" />
       <span className="text-sm">{label ?? 'Đang tải…'}</span>
     </div>
   )
@@ -152,7 +172,7 @@ export function Spinner({ label }: { label?: string }) {
 export function ProgressNote({ text }: { text: string }) {
   return (
     <div className="flex items-center gap-2.5 rounded-lg border border-border bg-bg px-3 py-2.5 text-[13px] text-secondary">
-      <SpinnerSm />
+      <HeroSpinner size="sm" color="current" />
       {text}
     </div>
   )

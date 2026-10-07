@@ -12,6 +12,7 @@ import { PlaceholderPage } from '../pages/placeholder'
 import { PublisherPage } from '../pages/publisher'
 import { QueuePage } from '../pages/queue'
 import { SchedulerPage } from '../pages/scheduler'
+import { SettingsPage } from '../pages/settings'
 import { StoryDetailPage } from '../pages/story-detail'
 import { StoryProjectsPage } from '../pages/story'
 
@@ -33,7 +34,7 @@ export const router = createBrowserRouter([
       { path: 'affiliate', element: <AffiliatePage /> },
       { path: 'ai/models', element: <AiModelsPage /> },
       { path: 'ai/router', element: <AiRouterPage /> },
-      { path: 'settings', element: <PlaceholderPage title="Cài đặt" /> },
+      { path: 'settings', element: <SettingsPage /> },
     ],
   },
 ])

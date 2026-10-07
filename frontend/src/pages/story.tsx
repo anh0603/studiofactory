@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { Clapperboard, Plus, Sparkles } from 'lucide-react'
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { api } from '../api/client'
@@ -41,8 +42,11 @@ export function StoryProjectsPage() {
       />
 
       {empty ? (
-        <section className="rounded-xl border border-border bg-surface px-5 py-7">
-          <h2 className="text-[17px] font-bold">Bạn bắt đầu một video ở đây</h2>
+        <section className="card hero-panel !px-5 !py-7">
+          <h2 className="flex items-center gap-2 text-[17px] font-bold">
+            <Sparkles className="h-[18px] w-[18px] text-accent" aria-hidden="true" />
+            Bạn bắt đầu một video ở đây
+          </h2>
           <p className="mt-1.5 max-w-2xl text-[13px] leading-relaxed text-secondary">
             Nhập một ý tưởng. Nhà máy sẽ viết kịch bản, chia cảnh, tạo hình và giọng đọc,
             dựng video rồi kiểm định trước khi bạn duyệt đăng.
@@ -50,7 +54,10 @@ export function StoryProjectsPage() {
           <ol className="mt-3.5 flex flex-wrap items-center gap-1.5">
             {FLOW.map((s, i) => (
               <li key={s} className="flex items-center gap-1.5">
-                <span className="rounded-md border border-border bg-[#10141A] px-2 py-1 text-[11px] font-medium text-secondary">
+                <span className="flex items-center gap-1.5 rounded-md border border-border bg-panel px-2 py-1 text-[11px] font-semibold text-secondary">
+                  <span className="flex h-4 w-4 items-center justify-center rounded bg-elevated font-mono text-[9px] font-bold text-accent">
+                    {i + 1}
+                  </span>
                   {s}
                 </span>
                 {i < FLOW.length - 1 ? <span aria-hidden="true" className="text-muted">→</span> : null}
@@ -61,7 +68,10 @@ export function StoryProjectsPage() {
       ) : null}
 
       <Card>
-        <h2 className="section-title mb-1">{empty ? 'Tạo Story đầu tiên' : 'Tạo Story mới'}</h2>
+        <h2 className="section-title mb-1 flex items-center gap-2">
+          <Plus className="h-4 w-4 text-accent" aria-hidden="true" />
+          {empty ? 'Tạo Story đầu tiên' : 'Tạo Story mới'}
+        </h2>
         <p className="mb-3 text-[13px] text-secondary">
           {empty ? 'Chỉ cần tên và ý tưởng. Phần còn lại nhà máy lo.' : 'Mỗi dự án là một video hoàn chỉnh.'}
         </p>
@@ -100,15 +110,22 @@ export function StoryProjectsPage() {
         <ul className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
           {projects.data.data.map((p) => (
             <li key={p.id}>
-              <Link to={`/story/${p.id}`} className="row-item row-item-hover block !p-4">
-                <div className="flex items-start justify-between gap-2">
-                  <p className="truncate font-semibold">{p.name}</p>
-                  <StatusBadge value={p.status} raw={false} className="shrink-0" />
+              <Link to={`/story/${p.id}`} className="row-item row-item-hover group block !p-4">
+                <div className="flex items-start gap-3">
+                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-border bg-panel text-secondary transition-colors duration-hover group-hover:border-ink/30 group-hover:text-accent" aria-hidden="true">
+                    <Clapperboard className="h-[18px] w-[18px]" />
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-start justify-between gap-2">
+                      <p className="truncate font-semibold">{p.name}</p>
+                      <StatusBadge value={p.status} raw={false} className="shrink-0" />
+                    </div>
+                    {p.description ? <p className="mt-1 line-clamp-2 text-[13px] text-secondary">{p.description}</p> : null}
+                    <p className="mt-2 text-[12px] text-muted">
+                      {p.audience || 'chưa rõ khán giả'} · {p.duration_target}s
+                    </p>
+                  </div>
                 </div>
-                {p.description ? <p className="mt-1 line-clamp-2 text-[13px] text-secondary">{p.description}</p> : null}
-                <p className="mt-2.5 text-[12px] text-muted">
-                  {p.audience || 'chưa rõ khán giả'} · {p.duration_target}s
-                </p>
               </Link>
             </li>
           ))}

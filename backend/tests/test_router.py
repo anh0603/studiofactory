@@ -326,12 +326,39 @@ def test_secret_absent_everywhere(client):
 
 
 def test_ssrf_provider_url_rejected(client):
-    for bad in ("http://localhost:9000", "http://127.0.0.1/x",
-                "http://169.254.169.254/", "ftp://example.com/x",
-                "http://10.0.0.5/", "http://192.168.1.1/"):
+    for bad in ("http://169.254.169.254/", "ftp://example.com/x",
+                "http://10.0.0.5/", "http://192.168.1.1/",
+                "http://metadata.google.internal/", "http://svc.internal/"):
         res = client.post("/api/v1/ai/providers",
                           json={"name": "evil", "adapter_key": "custom", "base_url": bad})
         assert res.status_code == 400, bad
+
+
+def test_loopback_provider_url_allowed_for_local_gateways(client):
+    """Local-first (project.md #3): operator-configured loopback gateways
+    (Ollama, LM Studio, FreeLLMAPI) must be registrable. Phase B."""
+    for good in ("http://localhost:3001/v1", "http://127.0.0.1:3001/v1"):
+        res = client.post("/api/v1/ai/providers",
+                          json={"name": "local-gw", "adapter_key": "custom", "base_url": good})
+        assert res.status_code == 201, good
+
+
+def test_keyless_model_skips_credential_gate(client):
+    """Phase B6: metadata {"keyless": true} (pollinations) is eligible without
+    a credential; the same model without the flag stays CREDENTIAL_MISSING."""
+    from app.ai.router import RouteInput, Router
+    base = {"id": "m1", "provider_id": "p1", "credential_ref": "",
+            "name": "FreeImg", "model_id": "flux", "capabilities": ["IMAGE"],
+            "priority": 100, "enabled": True, "cost_class": "FREE",
+            "license_status": "UNKNOWN", "health_status": "UNKNOWN"}
+    r = Router()
+    eligible, _ = r.eligible([{**base, "metadata": {"keyless": True}}], set(),
+                             RouteInput(task="T", capability="IMAGE"))
+    assert [m["id"] for m in eligible] == ["m1"]
+    eligible2, excluded = r.eligible([base], set(),
+                                     RouteInput(task="T", capability="IMAGE"))
+    assert eligible2 == []
+    assert excluded[0]["reason"] == "CREDENTIAL_MISSING"
 
 
 def test_empty_content_never_propagates_none():

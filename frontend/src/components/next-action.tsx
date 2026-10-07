@@ -14,8 +14,8 @@ const HEAD = {
 
 const HEAD_TONE = {
   DECISION: 'text-accent',
-  ACTIVITY: 'text-[#7BC8A4]',
-  WAITING: 'text-[#E8B04B]',
+  ACTIVITY: 'text-ok',
+  WAITING: 'text-warn',
   NONE: 'text-secondary',
 } as const
 

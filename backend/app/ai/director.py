@@ -67,6 +67,9 @@ def build_prompt(idea: str, audience: str, tone: str, duration: float,
         "duration, characters [character ids or names]}], "
         "visual_style, camera_style, voice_style, duration (seconds number), "
         "ending, cta.\n"
+        "Types: every value MUST be a string, except scene_number and duration "
+        "which MUST be numbers. Never use null — use an empty string when a "
+        "scene has no dialogue. Arrays must not be empty.\n"
         f"Idea: {idea}\nAudience: {audience}\nTone: {tone}\n"
         f"Target duration: {duration}s\nLanguage: {language}\nStyle: {style}\n"
         f"{char_block}"
@@ -102,8 +105,23 @@ def extract_json(text: str) -> Any:
     return json.loads(cleaned[start:end + 1])
 
 
+def _coerce_null_strings(node: Any) -> Any:
+    """Free-tier models emit explicit nulls for "no dialogue" despite being
+    told to use "". A null carries no information, so normalize it to the
+    schema default ("") BEFORE validation. Anything that is neither a string
+    nor null (lists, objects, numbers) still fails loudly in validate_plan —
+    this coerces nothing else. Phase B.
+    """
+    if isinstance(node, dict):
+        return {k: ("" if v is None else _coerce_null_strings(v))
+                for k, v in node.items()}
+    if isinstance(node, list):
+        return [("" if v is None else _coerce_null_strings(v)) for v in node]
+    return node
+
+
 def validate_plan(data: Any) -> DirectorPlanSchema:
     try:
-        return DirectorPlanSchema.model_validate(data)
+        return DirectorPlanSchema.model_validate(_coerce_null_strings(data))
     except ValidationError as exc:
         raise ValueError(f"plan schema invalid: {exc.errors()[0]['loc']}:{exc.errors()[0]['msg']}")

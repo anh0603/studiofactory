@@ -1,10 +1,12 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { Bot, Info, Users } from 'lucide-react'
 import { useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { api } from '../api/client'
 import type { DirectorPlan } from '../api/client'
 import { ErrorState, LoadingList } from '../components/states'
 import { NextActionBar } from '../components/next-action'
+import { VideoPlayer } from '../components/player'
 import { Card, Field, PageHeader, StatusBadge, Btn } from '../components/ui'
 import { WorkflowStepper, WorkflowStrip } from '../components/workflow'
 import { resolveNextAction, resolveWorkflow } from '../story/workflow'
@@ -131,6 +133,7 @@ export function StoryDetailPage() {
   const next = resolveNextAction(wfInput)
 
   const plan = planList.length ? planList.reduce((a, b) => (b.version > a.version ? b : a)) : null
+  const finalVideo = artList.find((a) => a.kind === 'VIDEO' && !a.scene_id) ?? null
 
   const onIntent = (intent: string) => {
     setActiveStep(next.step)
@@ -159,6 +162,15 @@ export function StoryDetailPage() {
 
       <div className="grid items-start gap-4 lg:grid-cols-4">
         <div className="lg:col-span-3">
+          {finalVideo ? (
+            <div className="mb-4">
+              <VideoPlayer
+                src={api.artifactUrl(finalVideo.id)}
+                title="Video hoàn thành"
+                downloadName="final.mp4"
+              />
+            </div>
+          ) : null}
           <Workspace
             activeStep={activeStep}
             project={p}
@@ -197,7 +209,8 @@ export function StoryDetailPage() {
             exportProject={async () => {
               const r = await api.exportProject(projectId!)
               const files = Object.keys(r.data.manifest.files ?? {})
-              return files.length ? files.join(', ') : r.request_id
+              const base = files.length ? files.join(', ') : r.request_id
+              return r.data.saved_to ? `${base} → ${r.data.saved_to}` : base
             }}
             createScene={(body) => addScene.mutate(body)}
             scenePending={addScene.isPending}
@@ -208,7 +221,10 @@ export function StoryDetailPage() {
         </div>
 
         <Card className="lg:col-span-1">
-          <h2 className="section-title mb-2.5">Thông tin dự án</h2>
+          <h2 className="section-title mb-2.5 flex items-center gap-2">
+            <Info className="h-4 w-4 text-accent" aria-hidden="true" />
+            Thông tin dự án
+          </h2>
           <dl className="space-y-1.5 text-[13px]">
             <div className="flex justify-between gap-2"><dt className="text-muted">Trạng thái</dt><dd><StatusBadge value={p.status} raw={false} /></dd></div>
             <div className="flex justify-between gap-2"><dt className="text-muted">Thời lượng</dt><dd className="text-secondary">{p.duration_target}s</dd></div>
@@ -218,12 +234,20 @@ export function StoryDetailPage() {
             <div className="flex justify-between gap-2"><dt className="text-muted">Đầu ra</dt><dd className="text-secondary">{outputLabel(artList)}</dd></div>
           </dl>
           <div className="mt-3 border-t border-border pt-3">
-            <h3 className="mb-1.5 text-[11px] font-bold uppercase tracking-[0.09em] text-secondary">Nhân vật</h3>
+            <h3 className="mb-1.5 flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-[0.09em] text-secondary">
+              <Users className="h-3.5 w-3.5" aria-hidden="true" />
+              Nhân vật
+            </h3>
             <ul className="space-y-1">
               {(characters.data?.data ?? []).map((c) => (
-                <li key={c.id} className="rounded-lg border border-border bg-bg px-2.5 py-1.5">
-                  <p className="truncate text-[13px] font-medium">{c.name}</p>
-                  <div className="mt-1"><StatusBadge value={c.lock_state} raw={false} /></div>
+                <li key={c.id} className="flex items-center gap-2 rounded-lg border border-border bg-bg px-2.5 py-1.5">
+                  <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-elevated text-[12px] font-bold text-accent" aria-hidden="true">
+                    {c.name.charAt(0).toUpperCase()}
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-[13px] font-medium">{c.name}</p>
+                    <div className="mt-0.5"><StatusBadge value={c.lock_state} raw={false} /></div>
+                  </div>
                 </li>
               ))}
             </ul>
@@ -257,8 +281,10 @@ function outputLabel(artifacts: { kind: string; scene_id?: string | null; width?
 function AutoPilotFooter({ run, runs }: { run: WorkflowInput['autopilot']; runs: { id: string; status: string }[] }) {
   return (
     <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-surface/40 px-4 py-2.5">
-      <p className="text-[13px] text-secondary">
-        Tự động hoá:{' '}
+      <p className="flex items-center gap-2 text-[13px] text-secondary">
+        <Bot className="h-4 w-4 shrink-0 text-accent" aria-hidden="true" />
+        <span>
+          Tự động hoá:{' '}
         {run ? (
           <span className="font-semibold text-ink">Đang chạy{run.planned ? ` · ${run.completed}/${run.planned}` : ''}</span>
         ) : runs.length > 0 ? (
@@ -266,6 +292,7 @@ function AutoPilotFooter({ run, runs }: { run: WorkflowInput['autopilot']; runs:
         ) : (
           <span className="text-secondary">Auto Pilot đang tắt</span>
         )}
+        </span>
       </p>
       <Link to="/autopilot" className="link-accent text-[13px]">Mở Auto Pilot</Link>
     </div>

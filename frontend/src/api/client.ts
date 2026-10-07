@@ -179,7 +179,7 @@ export const api = {
         body: JSON.stringify({ disclosure: true }),
       }),
   exportProject: (projectId: string) =>
-    request<{ request_id: string; data: { export_id: string; manifest: { files: Record<string, string> } } }>(
+    request<{ request_id: string; data: { export_id: string; manifest: { files: Record<string, string> }; saved_to: string | null; saved_files: string[]; save_error: string | null } }>(
       `/api/v1/projects/${projectId}/export`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ disclosure_text: 'AI-generated content.' }),
@@ -270,11 +270,43 @@ export const api = {
       body: JSON.stringify({ script_id: scriptId, generate_visual: visual }),
     }),
   afExportVideo: (videoId: string) =>
-    request<{ request_id: string; data: { manifest: { file: string } } }>(
+    request<{ request_id: string; data: { manifest: { file: string }; saved_to: string | null; saved_files: string[]; save_error: string | null } }>(
       `/api/v1/affiliate/videos/${videoId}/export`, { method: 'POST' }),
   // --- Analytics (Phase 9, real aggregations) ---
   analytics: () =>
     request<{ request_id: string; data: AnalyticsOverview }>('/api/v1/analytics/overview'),
+  // --- Settings: export folder lives server-side (local-first) ---
+  appSettings: () =>
+    request<{ request_id: string; data: { export_dir: string | null; export_dir_state: string } }>(
+      '/api/v1/settings'),
+  saveExportDir: (export_dir: string) =>
+    request<{ request_id: string; data: { export_dir: string | null; export_dir_state: string } }>(
+      '/api/v1/settings', {
+        method: 'PUT', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ export_dir }),
+      }),
+  clearExportDir: () =>
+    request<{ request_id: string; data: { export_dir: string | null; export_dir_state: string } }>(
+      '/api/v1/settings/export-dir', { method: 'DELETE' }),
+  // --- Media bytes for in-app preview (video player / images) ---
+  artifactMeta: (id: string) =>
+    request<{ request_id: string; data: Artifact }>(`/api/v1/artifacts/${id}`),
+  artifactUrl: (id: string) => `/api/v1/artifacts/${id}/content`,
+  affiliateImageUrl: (productId: string) =>
+    `/api/v1/affiliate/products/${productId}/image/content`,
+  affiliateVisualUrl: (videoId: string) =>
+    `/api/v1/affiliate/videos/${videoId}/visual/content`,
+  afUploadImage: (productId: string, file: File) => {
+    const fd = new FormData()
+    fd.append('file', file)
+    return request<{ request_id: string; data: { path: string; sha256: string; mime: string; width: number; height: number } }>(
+      `/api/v1/affiliate/products/${productId}/image`, { method: 'POST', body: fd })
+  },
+  afMoveScript: (scriptId: string, position: number) =>
+    request<{ request_id: string; data: AfScript }>(`/api/v1/affiliate/scripts/${scriptId}`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ position }),
+    }),
 }
 
 export interface Artifact {
@@ -376,6 +408,8 @@ export interface AfProduct {
   description: string
   price: string
   videos: number
+  image_path?: string | null
+  image_sha256?: string | null
 }
 
 export interface AfScript {
@@ -386,6 +420,7 @@ export interface AfScript {
   cta: string
   disclosure: string
   disclosure_injected: boolean
+  position: number
 }
 
 export interface AfVideo {

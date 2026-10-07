@@ -67,7 +67,11 @@ class Router:
                 reason = "DISABLED"
             elif inp.capability not in (m.get("capabilities") or []):
                 reason = "CAPABILITY_MISMATCH"
-            elif m.get("credential_ref") not in credentials_exist:
+            elif (m.get("credential_ref") not in credentials_exist
+                    and not (m.get("metadata") or {}).get("keyless")):
+                # Keyless public tiers (pollinations) declare
+                # metadata {"keyless": true} on the model row instead of a
+                # credential. Anything else without a credential is refused.
                 reason = "CREDENTIAL_MISSING"
             elif not cost_allowed(m.get("cost_class", "UNKNOWN"), inp.allow_paid):
                 reason = "PAID_MODEL_BLOCKED"
