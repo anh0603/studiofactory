@@ -1,28 +1,36 @@
 import { t } from '../i18n/strings.vi'
+import { Btn, SkeletonList, Spinner } from './ui'
 
 export function LoadingState({ label }: { label?: string }) {
-  return <div role="status" className="text-secondary">{label ?? t('state.loading')}</div>
+  return <Spinner label={label ?? t('state.loading')} />
 }
 
-export function EmptyState({ title, action }: { title?: string; action?: React.ReactNode }) {
+/** Preferred for page-level loads: no spinner, no layout jump. */
+export function LoadingList({ rows }: { rows?: number }) {
+  return <SkeletonList rows={rows} />
+}
+
+export function EmptyState({ title, hint, action, icon }: { title?: string; hint?: string; action?: React.ReactNode; icon?: string }) {
   return (
-    <div className="rounded border border-border bg-surface p-6 text-center">
-      <p className="text-ink">{title ?? t('state.empty')}</p>
-      {action ? <div className="mt-3">{action}</div> : null}
+    <div className="animate-fade-rise rounded-xl border border-dashed border-border bg-[#10141A] px-6 py-10 text-center">
+      <div className="empty-icon">{icon ?? '○'}</div>
+      <p className="text-sm font-medium text-secondary">{title ?? t('state.empty')}</p>
+      {hint ? <p className="mx-auto mt-1 max-w-md text-[12px] text-muted">{hint}</p> : null}
+      {action ? <div className="mt-4 flex justify-center">{action}</div> : null}
     </div>
   )
 }
 
 export function ErrorState({ message, onRetry, requestId }: { message: string; onRetry?: () => void; requestId?: string }) {
   return (
-    <div role="alert" className="rounded border border-border bg-surface p-6">
-      <p className="font-semibold text-ink">{t('state.error')}</p>
-      <p className="mt-1 text-secondary">{message}</p>
-      {requestId ? <p className="mt-1 text-xs text-muted">request_id: {requestId}</p> : null}
+    <div role="alert" className="animate-fade-rise rounded-xl border border-red-900/60 bg-red-950/20 p-5">
+      <p className="text-sm font-semibold text-red-300">{t('state.error')}</p>
+      <p className="mt-1 text-[13px] text-secondary">{message}</p>
+      {requestId ? <p className="mono mt-2 text-muted">request_id: {requestId}</p> : null}
       {onRetry ? (
-        <button onClick={onRetry} className="mt-3 rounded bg-accent px-3 py-1.5 text-sm font-semibold text-black">
+        <Btn variant="ghost" size="sm" onClick={onRetry} className="mt-3">
           {t('action.retry')}
-        </button>
+        </Btn>
       ) : null}
     </div>
   )

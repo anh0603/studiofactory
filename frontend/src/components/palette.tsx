@@ -20,10 +20,18 @@ export function CommandPalette() {
 
   if (!paletteOpen) return null
   return (
-    <div role="dialog" aria-label={t('palette.title')} className="fixed inset-0 z-40 bg-black/60 p-8" onClick={() => setPalette(false)}>
-      <div className="mx-auto max-w-lg rounded border border-border bg-surface p-4" onClick={(e) => e.stopPropagation()}>
+    <div
+      role="dialog"
+      aria-label={t('palette.title')}
+      className="fixed inset-0 z-40 animate-fade-rise bg-black/65 p-8"
+      onClick={() => setPalette(false)}
+    >
+      <div
+        className="mx-auto max-w-lg animate-panel-in rounded-xl border border-border bg-surface p-4 shadow-2xl"
+        onClick={(e) => e.stopPropagation()}
+      >
         <p className="text-sm font-semibold text-ink">{t('palette.title')}</p>
-        <p className="mt-2 text-xs text-muted">Phase 1: shell foundation. Commands land with features.</p>
+        <p className="mt-2 text-xs text-secondary">{t('palette.hint')}</p>
       </div>
     </div>
   )

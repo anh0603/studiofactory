@@ -72,27 +72,22 @@ def _route_for_director(db: Session, prompt: str, strategy: str,
         strategy=strategy, allow_paid=allow_paid,
         require_commercial=require_commercial, manual_model_id=manual_model_id,
         max_attempts=3), request_id)
-    # Record attempts into usage_events (same contract as /ai/router/generate).
-    import datetime as _dt
-    mock_any = False
-    for a in result.attempts:
-        is_mock = (providers.get(next(
-            (m["provider_id"] for m in models if m["name"] == a.model), ""),
-            {}).get("adapter_key") == "test")
-        mock_any = mock_any or is_mock
-        db.add(M.UsageEvent(id=f"uev_{uuid.uuid4().hex[:12]}", request_id=request_id,
-                            task="STORY_GENERATION", capability="STORY",
-                            provider=a.provider, model=a.model, attempt=a.attempt,
-                            latency_ms=a.latency_ms, status=a.status,
-                            error_category=a.error_code if a.status != "SUCCESS" else None,
-                            fallback_reason=a.fallback_reason or None,
-                            cost=None, cost_state="UNKNOWN", mock=is_mock))
+    # Record every user-triggered operation: per-attempt traces when a provider
+    # was contacted, or one pre-network BLOCKED row when gates refused it.
+    from ...ai.usage import record_routing
+    mock_any = record_routing(db, request_id=request_id, task="STORY_GENERATION",
+                              capability="STORY", result=result,
+                              providers=providers, models=models)
     if not result.ok and not result.attempts:
+        # Commit the BLOCKED activity row before the request rolls back, otherwise
+        # a refused generation leaves no trace at all (PASS 8 fix).
+        db.commit()
         raise AppError(result.error_code, result.error_message,
                        {"PAID_MODEL_BLOCKED": 402, "LICENSE_BLOCKED": 403,
                         "CREDENTIAL_MISSING": 409, "MODEL_UNAVAILABLE": 404}.get(
                            result.error_code, 400))
     if not result.ok:
+        db.commit()
         raise AppError(result.error_code or "UNKNOWN_ERROR",
                        result.error_message or "Director generation failed.", 502)
     last = result.attempts[-1]

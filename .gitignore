@@ -8,3 +8,4 @@ node_modules/
 dist/
 projects/
 .env
+backend/projects_preview/

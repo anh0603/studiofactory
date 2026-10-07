@@ -33,7 +33,7 @@ export const router = createBrowserRouter([
       { path: 'affiliate', element: <AffiliatePage /> },
       { path: 'ai/models', element: <AiModelsPage /> },
       { path: 'ai/router', element: <AiRouterPage /> },
-      { path: 'settings', element: <PlaceholderPage title="Settings" /> },
+      { path: 'settings', element: <PlaceholderPage title="Cài đặt" /> },
     ],
   },
 ])

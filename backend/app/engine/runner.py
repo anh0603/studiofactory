@@ -212,8 +212,10 @@ def _execute_node(db, job, node, request_id: str) -> tuple[bool, str, dict]:
         result = Router().route_media(kind, models, providers, secrets, refs, RouteInput(
             task=task_cap[0], capability=task_cap[1], prompt=prompt or "still",
             max_attempts=2), request_id)
-        _record_attempts(db, request_id, task_cap[0], task_cap[1], result, providers, models,
-                         job.id)
+        from ..ai.usage import record_routing
+        record_routing(db, request_id=request_id, task=task_cap[0],
+                       capability=task_cap[1], result=result, providers=providers,
+                       models=models, job_id=job.id)
         if not result.ok:
             return False, result.error_code or "UNKNOWN_ERROR", {}
         from ..media.validate import decode_payload as _dec
@@ -369,23 +371,16 @@ def _registry_full(db):
 
 
 def _is_mock(providers, models, attempt) -> bool:
-    return (providers.get(next(
-        (m["provider_id"] for m in models if m["name"] == attempt.model), ""),
-        {}).get("adapter_key") == "test")
+    from ..ai.usage import is_mock_attempt
+    return is_mock_attempt(providers, models, attempt.model)
 
 
 def _record_attempts(db, request_id, task, cap, result, providers, models, job_id):
-    import uuid as _uuid
-    from ..db import models as M
-    for a in result.attempts:
-        db.add(M.UsageEvent(id=f"uev_{_uuid.uuid4().hex[:12]}", request_id=request_id,
-                            job_id=job_id, task=task, capability=cap,
-                            provider=a.provider, model=a.model, attempt=a.attempt,
-                            latency_ms=a.latency_ms, status=a.status,
-                            error_category=a.error_code if a.status != "SUCCESS" else None,
-                            fallback_reason=a.fallback_reason or None,
-                            cost=None, cost_state="UNKNOWN",
-                            mock=_is_mock(providers, models, a)))
+    """Kept for existing importers; delegates to the shared recorder."""
+    from ..ai.usage import record_routing
+    return record_routing(db, request_id=request_id, task=task, capability=cap,
+                          result=result, providers=providers, models=models,
+                          job_id=job_id)
 
 
 def _dep_artifacts(db, node) -> list:

@@ -14,6 +14,7 @@ from ...ai.adapters import get_adapter, validate_provider_url
 from ...ai.circuit import breaker
 from ...ai.policies import cost_allowed, license_allowed
 from ...ai.router import STRATEGIES, RouteInput, Router
+from ...ai.usage import record_routing
 from ...core.config import settings
 from ...core.errors import error_body
 from ...core.exceptions import AppError
@@ -427,18 +428,11 @@ def router_generate(body: RouterGenerateIn, request: Request,
         strategy=body.strategy, allow_paid=body.allow_paid,
         require_commercial=body.require_commercial, manual_model_id=body.manual_model_id,
         job_id=body.job_id, max_attempts=max(1, min(body.max_attempts, 5))), rid)
-    # Record activity (append-only usage_events). No secrets.
-    import datetime as _dt
-    for a in result.attempts:
-        is_mock = (providers.get(next((m["provider_id"] for m in models if m["name"] == a.model), ""),
-                                 {}).get("adapter_key") == "test")
-        db.add(M.UsageEvent(id=f"uev_{uuid.uuid4().hex[:12]}", request_id=rid,
-                            job_id=body.job_id, task=body.task, capability=body.capability,
-                            provider=a.provider, model=a.model, attempt=a.attempt,
-                            latency_ms=a.latency_ms, status=a.status,
-                            error_category=a.error_code if a.status != "SUCCESS" else None,
-                            fallback_reason=a.fallback_reason or None,
-                            cost=None, cost_state="UNKNOWN", mock=is_mock))
+    # Record activity (append-only usage_events). Every user-triggered operation
+    # gets a row: per-attempt traces when a provider was contacted, or a single
+    # pre-network BLOCKED row when policy/credential gates refused it.
+    record_routing(db, request_id=rid, task=body.task, capability=body.capability,
+                   result=result, providers=providers, models=models, job_id=body.job_id)
     db.commit()
     if not result.ok and not result.attempts:
         status = {"PAID_MODEL_BLOCKED": 402, "LICENSE_BLOCKED": 403,
@@ -476,8 +470,12 @@ def usage(request: Request, db: Session = Depends(get_db)) -> dict:
     success = db.scalar(select(func.count()).where(M.UsageEvent.status == "SUCCESS")) or 0
     fallbacks = db.scalar(select(func.count()).where(M.UsageEvent.fallback_reason != None)) or 0  # noqa: E711
     avg_lat = db.scalar(select(func.avg(M.UsageEvent.latency_ms))) or 0
-    by_model = db.execute(select(M.UsageEvent.model,
-                                 func.count().label("n")).group_by(M.UsageEvent.model)).all()
+    # Breakdown by model only counts rows that actually named a provider/model.
+    # Pre-network BLOCKED rows have none and would otherwise appear as "" entries.
+    by_model = db.execute(
+        select(M.UsageEvent.model, func.count().label("n"))
+        .where(M.UsageEvent.model != "")
+        .group_by(M.UsageEvent.model)).all()
     return {"request_id": _rid(request), "data": {
         "requests": total, "successful": success, "failed": total - success,
         "fallbacks": fallbacks, "avg_latency_ms": round(float(avg_lat or 0), 1),

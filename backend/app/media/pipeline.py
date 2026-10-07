@@ -56,21 +56,12 @@ def _load_registry(db) -> tuple[list, dict, dict, set[str]]:
 
 def _record_usage(db, request_id: str, task: str, cap: str, attempts,
                   providers: dict, models: list, job_id: str | None = None) -> bool:
-    from ..db import models as M
-    mock_any = False
-    for a in attempts:
-        is_mock = (providers.get(next(
-            (m["provider_id"] for m in models if m["name"] == a.model), ""),
-            {}).get("adapter_key") == "test")
-        mock_any = mock_any or is_mock
-        db.add(M.UsageEvent(id=f"uev_{uuid.uuid4().hex[:12]}", request_id=request_id,
-                            job_id=job_id, task=task, capability=cap,
-                            provider=a.provider, model=a.model, attempt=a.attempt,
-                            latency_ms=a.latency_ms, status=a.status,
-                            error_category=a.error_code if a.status != "SUCCESS" else None,
-                            fallback_reason=a.fallback_reason or None,
-                            cost=None, cost_state="UNKNOWN", mock=is_mock))
-    return mock_any
+    """Kept for existing importers; delegates to the shared recorder."""
+    from ..ai.usage import record_attempts
+
+    return record_attempts(db, request_id=request_id, task=task, capability=cap,
+                           attempts=attempts, providers=providers, models=models,
+                           job_id=job_id)
 
 
 def generate_bytes(kind: str, prompt: str, db, request_id: str,
@@ -80,7 +71,8 @@ def generate_bytes(kind: str, prompt: str, db, request_id: str,
                    ) -> tuple[bytes, str, dict]:
     """Route + download/decode media. Returns (bytes, mime, trace_meta).
 
-    Raises PipelineError with typed codes. Policy blocks happen pre-network.
+    Raises PipelineError with typed codes. Policy blocks happen pre-network and
+    are still recorded as activity (status=BLOCKED, attempt=0).
     """
     task, cap = KIND_TASK_CAP[kind]
     models, providers, secrets, refs = _load_registry(db)
@@ -89,8 +81,10 @@ def generate_bytes(kind: str, prompt: str, db, request_id: str,
         allow_paid=allow_paid, require_commercial=require_commercial,
         manual_model_id=manual_model_id, job_id=job_id, max_attempts=3,
         timeout_s=timeout_s), request_id)
-    mock_any = _record_usage(db, request_id, task, cap, result.attempts,
-                             providers, models, job_id)
+    from ..ai.usage import record_routing
+    mock_any = record_routing(db, request_id=request_id, task=task,
+                              capability=cap, result=result, providers=providers,
+                              models=models, job_id=job_id)
     db.flush()
     if not result.ok:
         raise PipelineError(result.error_code or "UNKNOWN_ERROR",

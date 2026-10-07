@@ -21,7 +21,6 @@ from ...core.config import settings
 from ...core.exceptions import AppError
 from ...db import models as M
 from ...db.session import get_db
-from ...media.pipeline import _record_usage
 from ...storage.local import LocalStorage, PathJailError
 from .story import _sniff_image  # shared upload validation (ext/mime/magic/size)
 
@@ -199,10 +198,14 @@ def _router_text(db, prompt: str, request_id: str, style: str = "AUTO",
         task="SCRIPT_GENERATION", capability="TEXT", prompt=prompt,
         strategy=style if style in ("AUTO", "PRIORITY") else "AUTO",
         manual_model_id=manual_model_id, max_attempts=3), request_id)
-    mock_any = _record_usage(db, request_id, "SCRIPT_GENERATION", "TEXT",
-                             result.attempts, providers, models)
+    from ...ai.usage import record_routing
+    mock_any = record_routing(db, request_id=request_id, task="SCRIPT_GENERATION",
+                              capability="TEXT", result=result,
+                              providers=providers, models=models)
     db.flush()
     if not result.ok:
+        # Persist the BLOCKED/FAILED activity row before the request rolls back.
+        db.commit()
         raise AppError(result.error_code or "UNKNOWN_ERROR",
                        result.error_message or "affiliate generation failed.",
                        {"PAID_MODEL_BLOCKED": 402, "LICENSE_BLOCKED": 403,

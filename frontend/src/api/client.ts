@@ -84,6 +84,10 @@ export const api = {
     request<{ request_id: string; data: Project }>('/api/v1/projects', {
       method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
     }),
+  updateProject: (id: string, body: Record<string, unknown>) =>
+    request<{ request_id: string; data: Project }>(`/api/v1/projects/${id}`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+    }),
   project: (id: string) => request<{ request_id: string; data: Project }>(`/api/v1/projects/${id}`),
   characters: (projectId: string) =>
     request<{ request_id: string; data: Character[] }>(`/api/v1/projects/${projectId}/characters`),
@@ -91,8 +95,25 @@ export const api = {
     request<{ request_id: string; data: Character }>(`/api/v1/projects/${projectId}/characters`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
     }),
+  updateCharacter: (characterId: string, body: Record<string, unknown>) =>
+    request<{ request_id: string; data: Character }>(`/api/v1/characters/${characterId}`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+    }),
+  /** Reference image upload. Multipart per the API contract. */
+  uploadCharacterReference: (characterId: string, file: File) => {
+    const fd = new FormData()
+    fd.append('file', file)
+    return request<{ request_id: string; data: { artifact_id: string; path: string } }>(
+      `/api/v1/characters/${characterId}/references`,
+      { method: 'POST', body: fd },
+    )
+  },
   scenes: (projectId: string) =>
     request<{ request_id: string; data: Scene[] }>(`/api/v1/projects/${projectId}/scenes`),
+  createScene: (projectId: string, body: Record<string, unknown>) =>
+    request<{ request_id: string; data: Scene }>(`/api/v1/projects/${projectId}/scenes`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+    }),
   plans: (projectId: string) =>
     request<{ request_id: string; data: DirectorPlan[] }>(`/api/v1/projects/${projectId}/director`),
   latestPlan: (projectId: string) =>
@@ -121,6 +142,9 @@ export const api = {
   sceneArtifacts: (projectId: string, sceneId: string) =>
     request<{ request_id: string; data: Artifact[] }>(
       `/api/v1/projects/${projectId}/artifacts?scene_id=${sceneId}`),
+  /** Project-level artifact list. scene_id and kind are both optional server-side. */
+  sceneArtifactsAll: (projectId: string) =>
+    request<{ request_id: string; data: Artifact[] }>(`/api/v1/projects/${projectId}/artifacts`),
   genSceneMedia: (projectId: string, sceneId: string, kind: 'image' | 'video' | 'tts') =>
     request<{ request_id: string; data: { job_id: string; artifacts: Artifact[] } }>(
       `/api/v1/projects/${projectId}/scenes/${sceneId}/${kind}`, {
@@ -142,7 +166,14 @@ export const api = {
         method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({}),
       }),
   runQC: (projectId: string) =>
-    request<{ request_id: string; data: { qc: { verdict: string }; gate: { decision: string; reasons: string[] } } }>(
+    request<{
+      request_id: string
+      data: {
+        qc: { verdict: string; checks: { key: string; status: string; detail: string }[] }
+        gate: { decision: string; reasons: string[] }
+        job_id: string
+      }
+    }>(
       `/api/v1/projects/${projectId}/qc`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ disclosure: true }),
@@ -255,6 +286,11 @@ export interface Artifact {
   mime: string
   provider: string
   model: string
+  /** null for project-level output (final video); set for per-scene media. */
+  scene_id?: string | null
+  duration_s?: number | null
+  width?: number | null
+  height?: number | null
 }
 
 export interface JobNode {
@@ -449,6 +485,8 @@ export interface Project {
   audience: string
   duration_target: number
   status: string
+  created_at?: string
+  updated_at?: string
 }
 
 export interface Character {
@@ -457,7 +495,14 @@ export interface Character {
   kind: string
   name: string
   description: string
+  visual_identity: string
+  face: string
+  hair: string
+  clothes: string
+  colors: string
+  defining_features: string
   lock_state: string
+  reference_asset_id?: string | null
 }
 
 export interface Scene {
@@ -466,6 +511,12 @@ export interface Scene {
   description: string
   dialogue: string
   status: string
+  visual_prompt?: string
+  camera?: string
+  motion?: string
+  environment?: string
+  duration_s?: number | null
+  characters_json?: unknown[]
 }
 
 export interface DirectorPlan {
