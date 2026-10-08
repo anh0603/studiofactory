@@ -25,7 +25,7 @@ describe('ai model center', () => {
         <AiModelsPage />
       </QueryClientProvider>,
     )
-    await waitFor(() => expect(screen.getByText('Trung tâm mô hình AI')).toBeTruthy())
+    await waitFor(() => expect(screen.getByText('Mô hình AI')).toBeTruthy())
     expect(screen.getByText(/Chưa có nhà cung cấp/)).toBeTruthy()
   })
 })

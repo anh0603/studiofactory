@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { Plus } from 'lucide-react'
 import { useState } from 'react'
 import { api } from '../api/client'
 import { ExplainError } from '../components/explain-error'
@@ -37,6 +38,22 @@ const ADAPTERS = [
   { v: 'custom', label: 'Tuỳ chỉnh' },
 ]
 
+const LOGO_GRADS = [
+  'linear-gradient(135deg,#6d4aff,#22d3ee)',
+  'linear-gradient(135deg,#111827,#374151)',
+  'linear-gradient(135deg,#0ea5e9,#06b6d4)',
+  'linear-gradient(135deg,#ec4899,#f59e0b)',
+  'linear-gradient(135deg,#fbbf24,#f97316)',
+  'linear-gradient(135deg,#34d399,#22d3ee)',
+]
+
+function logoFor(name: string): { initials: string; grad: string } {
+  let h = 0
+  for (const c of name) h = (h * 31 + c.charCodeAt(0)) >>> 0
+  const clean = name.replace(/[^A-Za-z0-9]/g, '').slice(0, 2).toUpperCase() || 'AI'
+  return { initials: clean, grad: LOGO_GRADS[h % LOGO_GRADS.length] }
+}
+
 const PAID_BLOCKED = new Set(['PAID', 'TRIAL', 'UNKNOWN'])
 const COMMERCIAL_OK = new Set(['VERIFIED_COMMERCIAL'])
 
@@ -63,6 +80,7 @@ export function AiModelsPage() {
   const models = useQuery({ queryKey: ['models'], queryFn: api.models })
   const usage = useQuery({ queryKey: ['ai-usage'], queryFn: api.usage })
 
+  const [showAdd, setShowAdd] = useState(false)
   const [pName, setPName] = useState('')
   const [pUrl, setPUrl] = useState('')
   const [pAdapter, setPAdapter] = useState('openai_compatible')
@@ -89,6 +107,7 @@ export function AiModelsPage() {
       setPName(''); setPUrl('')
       setCredFor(res.data.id)
       setCredSaved('')
+      setShowAdd(false)
       refresh()
     },
   })
@@ -138,12 +157,21 @@ export function AiModelsPage() {
   const modelList = models.data!.data
   const warnings = blockedReasons(mCost, mLic)
   const step = providerList.length === 0 ? 1 : modelList.length === 0 ? 3 : 4
+  const modelsOf = (pid: string) => modelList.filter((m) => m.provider_id === pid)
 
   return (
     <div className="space-y-5">
       <PageHeader
-        title="Trung tâm mô hình AI"
-        sub="Dùng khoá của bạn · khoá được mã hoá và không hiển thị lại sau khi lưu"
+        title="Mô hình AI"
+        sub="Bạn dùng khoá API riêng · được mã hoá, không hiển thị lại"
+        actions={
+          providerList.length > 0 && !showAdd ? (
+            <Btn variant="accent" onClick={() => setShowAdd(true)}>
+              <Plus className="h-4 w-4" aria-hidden="true" />
+              Thêm nhà cung cấp
+            </Btn>
+          ) : undefined
+        }
       />
 
       <Card>
@@ -170,36 +198,109 @@ export function AiModelsPage() {
         </ol>
       </Card>
 
-      <div className="grid gap-3 lg:grid-cols-2">
-        <Card>
-          <h2 className="section-title mb-2.5">Nhà cung cấp ({providerList.length})</h2>
-          {providerList.length === 0 ? (
-            <EmptyState icon="◍" title="Chưa có nhà cung cấp." hint="Thêm một dịch vụ OpenAI-compatible rồi lưu khoá của bạn." />
-          ) : (
-            <ul className="space-y-1.5">
-              {providerList.map((p) => (
-                <li key={p.id} className="row-item flex items-center justify-between gap-2 !p-2.5">
-                  <div className="min-w-0">
-                    <p className="truncate text-sm font-semibold">
-                      {p.name} <span className="mono font-normal text-muted">{p.adapter_key}</span>
-                    </p>
-                    <p className="truncate text-xs text-muted">
-                      {p.base_url || 'chưa có địa chỉ'} · khoá:{' '}
+      {/* Providers — mockup list: logo, info, model chips, status */}
+      <div className="space-y-2.5">
+        {providerList.length === 0 ? (
+          <EmptyState icon="◇" title="Chưa có nhà cung cấp." hint="Thêm một dịch vụ OpenAI-compatible rồi lưu khoá của bạn." />
+        ) : providerList.map((p) => {
+          const logo = logoFor(p.name)
+          const pModels = modelsOf(p.id)
+          const resting = pModels.some((m) => ['QUOTA_EXHAUSTED', 'RATE_LIMITED'].includes(m.health_status))
+          return (
+            <div key={p.id}>
+              <div className="grid grid-cols-[1fr_auto] items-center gap-2 rounded-xl border border-border bg-surface p-4 transition-colors duration-hover hover:border-ink/30">
+                <button
+                  onClick={() => { setCredFor(p.id); setCredSaved('') }}
+                  title={p.credential_configured ? 'Đổi khoá' : 'Nhập khoá'}
+                  className="grid min-w-0 grid-cols-[44px_1fr_auto] items-center gap-4 text-left"
+                >
+                  <span
+                    aria-hidden="true"
+                    className="flex h-11 w-11 items-center justify-center rounded-xl text-sm font-bold text-white"
+                    style={{ background: logo.grad }}
+                  >
+                    {logo.initials}
+                  </span>
+                  <span className="min-w-0">
+                    <span className="block truncate text-sm font-semibold">{p.name}</span>
+                    <span className="block truncate text-xs text-muted">
+                      {p.base_url || 'chưa có địa chỉ'} · {pModels.length} mô hình · khoá:{' '}
                       {p.credential_configured ? 'đã cấu hình' : 'chưa cấu hình'}
-                    </p>
-                  </div>
-                  <div className="flex shrink-0 items-center gap-2">
-                    <StatusBadge value={healthVi(p.health) === 'Chưa kiểm tra' ? 'UNKNOWN' : p.health} label={healthVi(p.health)} raw={false} />
-                    <Btn variant="link" onClick={() => { setCredFor(p.id); setCredSaved('') }}>
-                      {p.credential_configured ? 'Đổi khoá' : 'Nhập khoá'}
+                    </span>
+                  </span>
+                  <span className="hidden flex-wrap justify-end gap-1 md:flex md:max-w-70">
+                    {pModels.slice(0, 3).map((m) => (
+                      <span key={m.id} className="badge badge-info">{m.name}</span>
+                    ))}
+                  </span>
+                </button>
+                <span className="flex shrink-0 flex-col items-end gap-1.5">
+                  {p.credential_configured ? (
+                    resting
+                      ? <span className="badge badge-warn">Tạm nghỉ</span>
+                      : <span className="badge badge-ok">Đã kết nối</span>
+                  ) : (
+                    <span className="badge badge-info">Chưa kết nối</span>
+                  )}
+                  <Btn variant="link" onClick={() => { setCredFor(p.id); setCredSaved('') }}>
+                    {p.credential_configured ? 'Đổi khoá' : 'Nhập khoá'}
+                  </Btn>
+                </span>
+              </div>
+              {credFor === p.id ? (
+                <div className="mt-2 rounded-xl border border-emberline bg-tint p-3">
+                  <p className="text-xs text-secondary">
+                    Khoá truy cập — nhập một lần, sau đó chỉ hiện trạng thái đã cấu hình.
+                  </p>
+                  <div className="mt-1.5 flex gap-2">
+                    <Field
+                      aria-label="Khoá truy cập"
+                      type="password"
+                      autoComplete="off"
+                      value={credSecret}
+                      onChange={(e) => setCredSecret(e.target.value)}
+                      placeholder="dán khoá của bạn"
+                      className="flex-1"
+                    />
+                    <Btn
+                      variant="accent"
+                      size="sm"
+                      busy={saveCred.isPending}
+                      disabled={!credSecret || saveCred.isPending}
+                      onClick={() => saveCred.mutate()}
+                    >
+                      Lưu
                     </Btn>
+                    <Btn size="sm" onClick={() => { setCredFor(''); setCredSecret(''); setCredSaved('') }}>Huỷ</Btn>
                   </div>
-                </li>
-              ))}
-            </ul>
-          )}
+                  {credSaved ? (
+                    <p className="mt-2 text-[12px] text-secondary">Đã lưu khoá. Giá trị không hiển thị lại.</p>
+                  ) : null}
+                  {saveCred.isError ? (
+                    <div className="mt-2">
+                      <ExplainError
+                        what="Không lưu được khoá."
+                        error={saveCred.error}
+                        todo="Kiểm tra khoá có đúng của nhà cung cấp này không."
+                      />
+                    </div>
+                  ) : null}
+                </div>
+              ) : null}
+            </div>
+          )
+        })}
+      </div>
 
-          <div className="mt-3 space-y-2 border-t border-border pt-3">
+      {showAdd || providerList.length === 0 ? (
+        <Card>
+          <div className="mb-2.5 flex items-center justify-between gap-2">
+            <h2 className="section-title">Thêm nhà cung cấp</h2>
+            {showAdd && providerList.length > 0 ? (
+              <Btn variant="link" onClick={() => setShowAdd(false)}>Đóng</Btn>
+            ) : null}
+          </div>
+          <div className="space-y-2">
             <Field
               aria-label="Tên nhà cung cấp"
               value={pName}
@@ -235,168 +336,127 @@ export function AiModelsPage() {
               />
             ) : null}
           </div>
-
-          {credFor ? (
-            <div className="mt-2.5 rounded-lg border border-emberline bg-tint p-3">
-              <p className="text-xs text-secondary">
-                Khoá truy cập — nhập một lần, sau đó chỉ hiện trạng thái đã cấu hình.
-              </p>
-              <div className="mt-1.5 flex gap-2">
-                <Field
-                  aria-label="Khoá truy cập"
-                  type="password"
-                  autoComplete="off"
-                  value={credSecret}
-                  onChange={(e) => setCredSecret(e.target.value)}
-                  placeholder="dán khoá của bạn"
-                  className="flex-1"
-                />
-                <Btn
-                  variant="accent"
-                  size="sm"
-                  busy={saveCred.isPending}
-                  disabled={!credSecret || saveCred.isPending}
-                  onClick={() => saveCred.mutate()}
-                >
-                  Lưu
-                </Btn>
-                <Btn size="sm" onClick={() => { setCredFor(''); setCredSecret(''); setCredSaved('') }}>Huỷ</Btn>
-              </div>
-              {credSaved ? (
-                <p className="mt-2 text-[12px] text-secondary">Đã lưu khoá. Giá trị không hiển thị lại.</p>
-              ) : null}
-              {saveCred.isError ? (
-                <div className="mt-2">
-                  <ExplainError
-                    what="Không lưu được khoá."
-                    error={saveCred.error}
-                    todo="Kiểm tra khoá có đúng của nhà cung cấp này không."
-                  />
-                </div>
-              ) : null}
-            </div>
-          ) : null}
         </Card>
+      ) : null}
 
-        <Card>
-          <h2 className="section-title mb-2.5">Mô hình ({modelList.length})</h2>
-          {modelList.length === 0 ? (
-            <EmptyState icon="◇" title="Chưa có mô hình nào." hint="Thêm mô hình cùng năng lực, chi phí và giấy phép để bộ định tuyến dùng được." />
-          ) : (
-            <ul className="space-y-1.5">
-              {modelList.map((m) => {
-                const t = testResult[m.id]
-                const blocked = blockedReasons(m.cost_class, m.license_status)
-                const use = usage.data?.data.by_model?.find((u) => u.model === m.name)
-                const okRate = use && use.count > 0 ? Math.round(((use.successful ?? 0) / use.count) * 100) : null
-                return (
-                  <li key={m.id} className="row-item !p-2.5">
-                    <div className="flex items-center justify-between gap-2">
-                      <p className="truncate text-sm font-semibold">{m.name}</p>
-                      <StatusBadge
-                        value={m.enabled ? 'ACTIVE' : 'DISABLED'}
-                        label={m.enabled ? 'Đang bật' : 'Đã tắt'}
-                        raw={false}
-                        className="shrink-0"
-                      />
-                    </div>
-                    <p className="mono mt-1 break-all text-muted">{m.model_id}</p>
-                    <p className="mt-1 text-xs text-secondary">
-                      {m.capabilities.map((c) => CAPS[c] ?? c).join(' · ')} · ưu tiên {m.priority} ·{' '}
-                      {statusVi[m.cost_class] ?? m.cost_class} ·{' '}
-                      {statusVi[m.license_status] ?? m.license_status}
+      <Card>
+        <h2 className="section-title mb-2.5">Mô hình ({modelList.length})</h2>
+        {modelList.length === 0 ? (
+          <EmptyState icon="◇" title="Chưa có mô hình nào." hint="Thêm mô hình cùng năng lực, chi phí và giấy phép để bộ định tuyến dùng được." />
+        ) : (
+          <ul className="space-y-1.5">
+            {modelList.map((m) => {
+              const t = testResult[m.id]
+              const blocked = blockedReasons(m.cost_class, m.license_status)
+              const use = usage.data?.data.by_model?.find((u) => u.model === m.name)
+              const okRate = use && use.count > 0 ? Math.round(((use.successful ?? 0) / use.count) * 100) : null
+              return (
+                <li key={m.id} className="row-item !p-2.5">
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="truncate text-sm font-semibold">{m.name}</p>
+                    <StatusBadge
+                      value={m.enabled ? 'ACTIVE' : 'DISABLED'}
+                      label={m.enabled ? 'Đang bật' : 'Đã tắt'}
+                      raw={false}
+                      className="shrink-0"
+                    />
+                  </div>
+                  <p className="mono mt-1 break-all text-muted">{m.model_id}</p>
+                  <p className="mt-1 text-xs text-secondary">
+                    {m.capabilities.map((c) => CAPS[c] ?? c).join(' · ')} · ưu tiên {m.priority} ·{' '}
+                    {statusVi[m.cost_class] ?? m.cost_class} ·{' '}
+                    {statusVi[m.license_status] ?? m.license_status}
+                  </p>
+                  <p className="mt-1 text-xs">
+                    <span className="text-muted">Tình trạng: </span>
+                    <StatusBadge value={healthVi(m.health_status) === 'Chưa kiểm tra' ? 'UNKNOWN' : m.health_status} label={healthVi(m.health_status)} raw={false} />
+                  </p>
+                  <p className="mono mt-1 text-muted">
+                    {use
+                      ? `Đã dùng ${use.count} · thành công ${okRate ?? 0}% · TB ${use.avg_latency_ms ?? 0}ms${use.last_used_at ? ` · mới nhất ${use.last_used_at.slice(0, 16).replace('T', ' ')}` : ''}`
+                      : 'Chưa phát sinh lượt gọi nào được ghi nhận.'}
+                  </p>
+                  {blocked.length > 0 ? (
+                    <ul className="mt-1 space-y-0.5 text-[12px] text-warn">
+                      {blocked.map((b) => <li key={b}>Bị chặn: {b}</li>)}
+                    </ul>
+                  ) : null}
+                  {t ? (
+                    <p className="mt-1 text-xs text-ember">
+                      Kiểm tra năng lực {mCap}: {statusVi[t.state] ?? t.state}
+                      {t.mock ? ' (giả lập)' : ' (thật)'}
+                      {t.error ? ` · ${errorCodeVi[t.error] ?? t.error}` : ''}
+                      {t.note ? ` · ${t.note}` : ''}
                     </p>
-                    <p className="mt-1 text-xs">
-                      <span className="text-muted">Tình trạng: </span>
-                      <StatusBadge value={healthVi(m.health_status) === 'Chưa kiểm tra' ? 'UNKNOWN' : m.health_status} label={healthVi(m.health_status)} raw={false} />
-                    </p>
-                    <p className="mono mt-1 text-muted">
-                      {use
-                        ? `Đã dùng ${use.count} · thành công ${okRate ?? 0}% · TB ${use.avg_latency_ms ?? 0}ms${use.last_used_at ? ` · mới nhất ${use.last_used_at.slice(0, 16).replace('T', ' ')}` : ''}`
-                        : 'Chưa phát sinh lượt gọi nào được ghi nhận.'}
-                    </p>
-                    {blocked.length > 0 ? (
-                      <ul className="mt-1 space-y-0.5 text-[12px] text-warn">
-                        {blocked.map((b) => <li key={b}>Bị chặn: {b}</li>)}
-                      </ul>
-                    ) : null}
-                    {t ? (
-                      <p className="mt-1 text-xs text-ember">
-                        Kiểm tra năng lực {mCap}: {statusVi[t.state] ?? t.state}
-                        {t.mock ? ' (giả lập)' : ' (thật)'}
-                        {t.error ? ` · ${errorCodeVi[t.error] ?? t.error}` : ''}
-                        {t.note ? ` · ${t.note}` : ''}
-                      </p>
-                    ) : null}
-                    <div className="mt-1.5 flex gap-3">
-                      <Btn variant="link" onClick={() => toggleModel.mutate(m)}>{m.enabled ? 'Tắt' : 'Bật'}</Btn>
-                      <Btn variant="link" busy={t?.state === 'PENDING'} onClick={() => runTest(m.id)}>Kiểm tra năng lực</Btn>
-                      <Btn variant="link" onClick={() => deleteModel.mutate(m.id)}>Xoá</Btn>
-                    </div>
-                  </li>
-                )
-              })}
-            </ul>
-          )}
+                  ) : null}
+                  <div className="mt-1.5 flex gap-3">
+                    <Btn variant="link" onClick={() => toggleModel.mutate(m)}>{m.enabled ? 'Tắt' : 'Bật'}</Btn>
+                    <Btn variant="link" busy={t?.state === 'PENDING'} onClick={() => runTest(m.id)}>Kiểm tra năng lực</Btn>
+                    <Btn variant="link" onClick={() => deleteModel.mutate(m.id)}>Xoá</Btn>
+                  </div>
+                </li>
+              )
+            })}
+          </ul>
+        )}
 
-          <div className="mt-3 space-y-2 border-t border-border pt-3">
-            <Select aria-label="Nhà cung cấp của mô hình" value={mProvider} onChange={(e) => setMProvider(e.target.value)}>
-              <option value="">— Chọn nhà cung cấp —</option>
-              {providerList.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-            </Select>
-            <div className="grid gap-2 sm:grid-cols-2">
-              <Field aria-label="Tên mô hình" value={mName} onChange={(e) => setMName(e.target.value)} placeholder="Tên hiển thị" />
-              <Field aria-label="Mã mô hình" value={mId} onChange={(e) => setMId(e.target.value)} placeholder="mã gửi tới nhà cung cấp" />
-            </div>
-            <div className="grid gap-2 sm:grid-cols-3">
-              <Select aria-label="Năng lực" value={mCap} onChange={(e) => setMCap(e.target.value)}>
-                {Object.entries(CAPS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
-              </Select>
-              <Select aria-label="Lớp chi phí" value={mCost} onChange={(e) => setMCost(e.target.value)}>
-                {COST_CLASSES.map((c) => <option key={c.v} value={c.v}>{c.label}</option>)}
-              </Select>
-              <Select aria-label="Giấy phép" value={mLic} onChange={(e) => setMLic(e.target.value)}>
-                {LICENSES.map((l) => <option key={l.v} value={l.v}>{l.label}</option>)}
-              </Select>
-            </div>
-            <div className="flex items-center gap-2">
-              <Field
-                aria-label="Ưu tiên"
-                type="number"
-                value={mPriority}
-                onChange={(e) => setMPriority(e.target.value)}
-                className="w-28"
-              />
-              <p className="text-[11px] text-muted">Số lớn hơn được chọn trước.</p>
-            </div>
-            {warnings.length > 0 ? (
-              <ul className="space-y-0.5 rounded-lg border border-emberline bg-tint p-2.5 text-[12px] text-warn">
-                {warnings.map((w) => <li key={w}>{w}</li>)}
-              </ul>
-            ) : null}
-            <Btn
-              variant="accent"
-              busy={createModel.isPending}
-              disabled={!mProvider || !mName.trim() || createModel.isPending}
-              onClick={() => createModel.mutate()}
-              className="w-full"
-            >
-              Thêm mô hình
-            </Btn>
-            {createModel.isError ? (
-              <ExplainError
-                what="Không thêm được mô hình."
-                error={createModel.error}
-                todo="Kiểm tra đã chọn nhà cung cấp và tên năng lực còn hợp lệ không."
-              />
-            ) : null}
-            <p className="text-[11px] leading-relaxed text-muted">
-              Mô hình mới bắt đầu ở trạng thái “Chưa kiểm tra”. Kiểm tra năng lực chỉ xác nhận tới được
-              nhà cung cấp và đúng danh sách model — không khẳng định đã sinh nội dung thành công.
-            </p>
+        <div className="mt-3 space-y-2 border-t border-border pt-3">
+          <Select aria-label="Nhà cung cấp của mô hình" value={mProvider} onChange={(e) => setMProvider(e.target.value)}>
+            <option value="">— Chọn nhà cung cấp —</option>
+            {providerList.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+          </Select>
+          <div className="grid gap-2 sm:grid-cols-2">
+            <Field aria-label="Tên mô hình" value={mName} onChange={(e) => setMName(e.target.value)} placeholder="Tên hiển thị" />
+            <Field aria-label="Mã mô hình" value={mId} onChange={(e) => setMId(e.target.value)} placeholder="mã gửi tới nhà cung cấp" />
           </div>
-        </Card>
-      </div>
+          <div className="grid gap-2 sm:grid-cols-3">
+            <Select aria-label="Năng lực" value={mCap} onChange={(e) => setMCap(e.target.value)}>
+              {Object.entries(CAPS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+            </Select>
+            <Select aria-label="Lớp chi phí" value={mCost} onChange={(e) => setMCost(e.target.value)}>
+              {COST_CLASSES.map((c) => <option key={c.v} value={c.v}>{c.label}</option>)}
+            </Select>
+            <Select aria-label="Giấy phép" value={mLic} onChange={(e) => setMLic(e.target.value)}>
+              {LICENSES.map((l) => <option key={l.v} value={l.v}>{l.label}</option>)}
+            </Select>
+          </div>
+          <div className="flex items-center gap-2">
+            <Field
+              aria-label="Ưu tiên"
+              type="number"
+              value={mPriority}
+              onChange={(e) => setMPriority(e.target.value)}
+              className="w-28"
+            />
+            <p className="text-[11px] text-muted">Số lớn hơn được chọn trước.</p>
+          </div>
+          {warnings.length > 0 ? (
+            <ul className="space-y-0.5 rounded-lg border border-emberline bg-tint p-2.5 text-[12px] text-warn">
+              {warnings.map((w) => <li key={w}>{w}</li>)}
+            </ul>
+          ) : null}
+          <Btn
+            variant="accent"
+            busy={createModel.isPending}
+            disabled={!mProvider || !mName.trim() || createModel.isPending}
+            onClick={() => createModel.mutate()}
+            className="w-full"
+          >
+            Thêm mô hình
+          </Btn>
+          {createModel.isError ? (
+            <ExplainError
+              what="Không thêm được mô hình."
+              error={createModel.error}
+              todo="Kiểm tra đã chọn nhà cung cấp và tên năng lực còn hợp lệ không."
+            />
+          ) : null}
+          <p className="text-[11px] leading-relaxed text-muted">
+            Mô hình mới bắt đầu ở trạng thái “Chưa kiểm tra”. Kiểm tra năng lực chỉ xác nhận tới được
+            nhà cung cấp và đúng danh sách model — không khẳng định đã sinh nội dung thành công.
+          </p>
+        </div>
+      </Card>
     </div>
   )
 }
