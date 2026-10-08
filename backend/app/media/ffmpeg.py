@@ -113,14 +113,20 @@ def compose_scene(image: Path, audio: Path | None, subtitle: Path | None,
     never burned via libass: the subtitles filter hangs on this Windows
     build (verified), while muxing is fast, deterministic, and keeps the
     SRT content verifiable via ffprobe.
+
+    The still image gets a subtle slow push-in (zoompan 1.0 -> 1.12) so the
+    video has real motion instead of a frozen frame under running audio.
     """
-    cmd: list[str] = ["-loop", "1", "-i", str(image)]
+    frames = max(int(max(duration_s, 0.5) * 25), 1)
+    cmd: list[str] = ["-loop", "1", "-framerate", "25", "-i", str(image)]
     if audio is not None:
         cmd += ["-i", str(audio)]
     if subtitle is not None:
         cmd += ["-i", str(subtitle)]
-    vf = f"scale={width}:{height}:force_original_aspect_ratio=increase," \
-         f"crop={width}:{height}"
+    vf = (f"scale=1440:2560:force_original_aspect_ratio=increase,"
+          f"crop=1440:2560,"
+          f"zoompan=z='1+0.12*on/{frames}':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)'"
+          f":d=1:s={width}x{height}:fps=25")
     cmd += ["-vf", vf, "-c:v", "libx264", "-pix_fmt", "yuv420p",
             "-t", f"{max(duration_s, 0.5):.2f}",
             # Faststart: moov before mdat so browsers start playback

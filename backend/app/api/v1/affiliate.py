@@ -269,12 +269,12 @@ def create_script(product_id: str, body: ScriptIn, request: Request,
     if body.style not in SCRIPT_STYLES:
         raise AppError("BAD_REQUEST", f"unknown style: {body.style}", 400)
     p = _get_product(db, product_id)
-    prompt = (f"Write a short affiliate video script in style {body.style}. "
-              "Respond with ONE JSON object only: "
+    prompt = (f"Viết một kịch bản video affiliate ngắn gọn bằng TIẾNG VIỆT, phong cách {body.style}. "
+              "Chỉ trả về MỘT object JSON duy nhất, không giải thích thêm: "
               '{"hook": "...", "body": "...", "cta": "...", "disclosure": "..."}. '
-              "disclosure MUST be a proper affiliate disclosure sentence. "
-              f"Product: {p.name}. Description: {p.description}. Price: {p.price}. "
-              f"URL: {p.affiliate_url}. Audience: {p.audience}. Tone: {p.tone}.")
+              "disclosure PHẢI là một câu công bố affiliate bằng tiếng Việt. "
+              f"Sản phẩm: {p.name}. Mô tả: {p.description}. Giá: {p.price}. "
+              f"URL: {p.affiliate_url}. Khán giả: {p.audience}. Giọng điệu: {p.tone}.")
     output, provider, model, mock_any, _ = _router_text(
         db, prompt, rid, body.strategy, body.manual_model_id)
     try:
@@ -527,12 +527,13 @@ def revise_script(video_id: str, body: ReviseIn, request: Request,
     if script is None:
         raise AppError("BAD_REQUEST", "Video has no script to revise.", 400)
     prompt = (
-        "Rewrite this affiliate video script following the user's request. "
-        "Respond with ONE JSON object only: "
+        "Viết lại kịch bản video affiliate này theo yêu cầu của người dùng, "
+        "toàn bộ bằng TIẾNG VIỆT. "
+        "Chỉ trả về MỘT object JSON duy nhất: "
         '{"hook": "...", "body": "...", "cta": "...", "disclosure": "..."}. '
-        f"Product: {p.name}. Description: {p.description}. "
-        f"Current hook: {script.hook} Current body: {script.body} "
-        f"Current cta: {script.cta} User request: {body.message}")
+        f"Sản phẩm: {p.name}. Mô tả: {p.description}. "
+        f"Hook hiện tại: {script.hook} Nội dung hiện tại: {script.body} "
+        f"CTA hiện tại: {script.cta} Yêu cầu: {body.message}")
     output, provider, model, mock_any, _ = _router_text(
         db, prompt, rid, body.strategy, None)
     try:
