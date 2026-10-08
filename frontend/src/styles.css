@@ -209,6 +209,109 @@ a { color: inherit; }
     background-size: 200% 100%;
     @apply animate-shimmer;
   }
+
+  /* Affiliate studio (mockup): form panel + 9:16 phone stage. Phone stays
+     dark in both themes like a real video player. */
+  .affil-layout { @apply grid items-start gap-4 xl:grid-cols-[380px_1fr]; }
+  .form-panel { @apply overflow-hidden rounded-xl border border-border bg-surface; box-shadow: var(--shadow-card); }
+  .form-head { @apply flex items-center gap-2.5 border-b border-border px-4 py-3.5; }
+  .form-head .step {
+    @apply flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-md text-[11px] font-bold;
+    background: linear-gradient(135deg, #f472b6 0%, #fbbf24 100%);
+    color: #1a0a0e;
+  }
+  .form-head .title { @apply text-[13.5px] font-semibold; }
+  .form-head .sub { @apply text-[11.5px] text-muted; }
+  .form-body { @apply p-4; }
+  .form-group { @apply mb-4; }
+  .form-group:last-child { @apply mb-0; }
+  .form-label { @apply mb-1.5 flex items-center gap-1.5 text-[12px] font-medium text-secondary; }
+  .form-label .hint { @apply ml-auto text-[10.5px] font-normal text-muted; }
+  .gen-btn {
+    @apply mt-1.5 flex w-full items-center justify-center gap-2 rounded-xl px-4 py-3 text-[13.5px] font-semibold;
+    background: linear-gradient(135deg, #f472b6 0%, #fbbf24 100%);
+    color: #1a0a0e;
+    box-shadow: 0 8px 24px -8px rgba(244, 114, 182, 0.6);
+    transition: filter 150ms ease-out;
+  }
+  .gen-btn:hover:not(:disabled) { filter: brightness(1.05); }
+  .gen-btn:disabled { @apply cursor-not-allowed opacity-40; }
+  .affil-stage {
+    @apply relative flex gap-7 overflow-hidden rounded-xl border border-border bg-surface p-7;
+    background-image: radial-gradient(ellipse at 50% 30%, rgb(var(--c-pink) / 0.08), transparent 60%);
+  }
+  .affil-phone {
+    @apply relative aspect-[9/16] h-[420px] shrink-0 overflow-hidden;
+    border-radius: 20px;
+    border: 1px solid rgb(var(--c-border));
+    box-shadow: 0 30px 60px -20px rgba(0, 0, 0, 0.7), 0 0 50px -10px rgb(var(--c-pink) / 0.25);
+    background: #0a0712;
+  }
+  .affil-phone video { @apply absolute inset-0 h-full w-full object-cover; }
+  .affil-badge-corner {
+    @apply absolute left-3 top-3 z-10 rounded-md px-2 py-1 text-[10px] font-semibold text-white;
+    background: rgba(0, 0, 0, 0.7);
+    backdrop-filter: blur(8px);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+  }
+  .affil-headline { @apply absolute left-0 right-0 top-[10%] z-10 px-4 text-center; }
+  .affil-headline .line1 { @apply mb-0.5 text-[11px] font-semibold uppercase tracking-[0.15em]; color: #fbbf24; }
+  .affil-headline .line2 {
+    @apply text-[18px] font-bold leading-tight text-white;
+    text-shadow: 0 2px 8px rgba(0, 0, 0, 0.6);
+    display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden;
+  }
+  .affil-price {
+    @apply absolute left-1/2 z-10 flex -translate-x-1/2 items-baseline gap-2;
+    bottom: 34%;
+  }
+  .affil-price .new {
+    @apply text-[22px] font-extrabold text-white;
+    text-shadow: 0 2px 12px rgba(0, 0, 0, 0.6);
+  }
+  .affil-cta {
+    @apply absolute left-4 right-4 z-10 rounded-[10px] px-3 py-2.5 text-center text-[13px] font-bold;
+    bottom: 14%;
+    background: linear-gradient(135deg, #f472b6, #fbbf24);
+    color: #1a0a0e;
+    box-shadow: 0 8px 20px -4px rgba(244, 114, 182, 0.6);
+  }
+  .affil-sub { @apply absolute bottom-[6%] left-4 right-4 z-10 text-center; }
+  .affil-sub .pill {
+    @apply inline-block rounded-lg px-3 py-1.5 text-[11.5px] font-medium leading-snug text-white;
+    background: rgba(0, 0, 0, 0.75);
+    backdrop-filter: blur(8px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+  }
+  .affil-ftc { @apply absolute bottom-2 left-0 right-0 z-10 text-center text-[9px]; color: rgba(255, 255, 255, 0.5); }
+  .affil-progress { @apply absolute inset-x-0 bottom-0 z-10 h-[3px]; background: rgba(255, 255, 255, 0.08); }
+  .affil-progress i { @apply block h-full; background: linear-gradient(90deg, #f472b6, #fbbf24); transition: width 500ms ease-out; }
+  .hook-opt {
+    @apply mb-1.5 flex cursor-pointer items-start gap-2.5 rounded-lg border border-border p-2.5 text-[12.5px] leading-snug;
+    transition: background-color 150ms ease-out, border-color 150ms ease-out;
+  }
+  .hook-opt:last-child { @apply mb-0; }
+  .hook-opt:hover { @apply bg-raised; }
+  .hook-opt.on { border-color: rgb(var(--c-pink) / 0.5); background: rgb(var(--c-pink) / 0.06); }
+  .hook-opt .radio { @apply mt-0.5 h-3.5 w-3.5 shrink-0 rounded-full border; border-color: rgb(var(--c-muted)); position: relative; }
+  .hook-opt.on .radio { border-color: rgb(var(--c-pink)); }
+  .hook-opt.on .radio::after {
+    content: ""; position: absolute; inset: 3px; border-radius: 50%;
+    background: rgb(var(--c-pink));
+  }
+  .ftc-panel {
+    @apply flex items-start gap-3 rounded-xl border p-3.5;
+    background: rgb(var(--c-warn) / 0.06);
+    border-color: rgb(var(--c-warn) / 0.25);
+  }
+  .ftc-panel .ico {
+    @apply flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-[15px];
+    background: rgb(var(--c-warn) / 0.15);
+    border: 1px solid rgb(var(--c-warn) / 0.35);
+  }
+  .ftc-panel .title { @apply mb-0.5 text-[12.5px] font-semibold; color: rgb(var(--c-warn)); }
+  .ftc-panel .desc { @apply text-[11.5px] leading-relaxed text-secondary; }
 }
 
 /* Reduced motion: drop decorative loops, keep state legible without movement. */

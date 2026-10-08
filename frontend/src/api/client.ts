@@ -249,7 +249,13 @@ export const api = {
     request<{ request_id: string; data: AfProduct[] }>('/api/v1/affiliate/products'),
   afCreateProduct: (body: Record<string, unknown>) =>
     request<{ request_id: string; data: AfProduct }>('/api/v1/affiliate/products', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    }),
+  afPatchProduct: (id: string, body: Record<string, unknown>) =>
+    request<{ request_id: string; data: AfProduct }>(`/api/v1/affiliate/products/${id}`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
     }),
   afAnalyze: (id: string) =>
     request<{ request_id: string; data: { analysis: Record<string, unknown> } }>(
@@ -410,6 +416,9 @@ export interface AfProduct {
   videos: number
   image_path?: string | null
   image_sha256?: string | null
+  audience?: string | null
+  tone?: string | null
+  style?: string | null
 }
 
 export interface AfScript {

@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { GripVertical, ImagePlus, Send } from 'lucide-react'
 import { useState } from 'react'
 import { api } from '../api/client'
-import type { AfScript, AfVideo } from '../api/client'
+import type { AfProduct, AfScript, AfVideo } from '../api/client'
 import { EmptyState } from '../components/states'
 import { Btn, Card, Field, PageHeader, Select, StatusBadge } from '../components/ui'
 import { VideoPlayer } from '../components/player'
@@ -14,15 +14,17 @@ const STYLES: Record<string, string> = {
   TOP_PRODUCT: 'Sản phẩm nổi bật',
 }
 
+const TONES = ['Chuyên nghiệp', 'Thân thiện', 'Hài hước', 'Gấp gáp']
+
 function ProgressRing({ pct }: { pct: number }) {
   const r = 26
   const c = 2 * Math.PI * r
   return (
     <svg width="72" height="72" viewBox="0 0 72 72" role="img" aria-label={`Hoàn thành ${pct}%`}>
-      <circle cx="36" cy="36" r={r} fill="none" strokeWidth="7" className="stroke-border" />
+      <circle cx="36" cy="36" r={r} fill="none" strokeWidth="7" className="stroke-white/10" />
       <circle
         cx="36" cy="36" r={r} fill="none" strokeWidth="7" strokeLinecap="round"
-        className="stroke-accent transition-[stroke-dashoffset] duration-500"
+        className="stroke-white transition-[stroke-dashoffset] duration-500"
         strokeDasharray={c}
         strokeDashoffset={c * (1 - Math.max(0, Math.min(100, pct)) / 100)}
         transform="rotate(-90 36 36)"
@@ -170,6 +172,52 @@ function VideoJobCard({ v, stillSrc, onRender, onExport, onRevise }: {
   )
 }
 
+/** Phone stage per mockup: real product art, hook, price, CTA, subtitle. */
+function StagePhone({ product, script, video }: {
+  product: AfProduct | undefined
+  script: AfScript | null
+  video: AfVideo | null
+}) {
+  const img = product ? api.affiliateImageUrl(product.id) : null
+  if (video?.has_video) {
+    return (
+      <div className="affil-phone">
+        <video src={api.affiliateFileUrl(video.id)} controls playsInline preload="metadata" className="absolute inset-0 h-full w-full object-cover" />
+        <span className="affil-badge-corner">Quảng cáo · Affiliate</span>
+      </div>
+    )
+  }
+  const rendering = video?.status === 'RENDERING'
+  const pct = Math.max(0, Math.min(100, video?.progress ?? 0))
+  return (
+    <div className="affil-phone">
+      <div className="affil-scene" />
+      {img ? <img src={img} alt="" aria-hidden="true" className="absolute inset-0 h-full w-full object-cover opacity-70" /> : null}
+      <span className="affil-badge-corner">Quảng cáo · Affiliate</span>
+      <div className="affil-headline">
+        <div className="line1">{product?.name ?? ''}</div>
+        <div className="line2">{script?.hook || product?.description || ''}</div>
+      </div>
+      {product?.price ? (
+        <div className="affil-price"><span className="new">{product.price}</span></div>
+      ) : null}
+      <div className="affil-cta">{script?.cta || 'Mua ngay →'}</div>
+      <div className="affil-sub"><span className="pill">{script?.body?.slice(0, 90) || product?.description || ''}</span></div>
+      {rendering ? (
+        <>
+          <div className="absolute inset-0 z-10 bg-black/45" />
+          <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-2">
+            <ProgressRing pct={pct} />
+            <p className="text-lg font-extrabold tabular-nums text-white">{pct}%</p>
+          </div>
+          <div className="affil-progress"><i style={{ width: `${pct}%` }} /></div>
+        </>
+      ) : null}
+      <div className="affil-ftc">{script?.disclosure || 'Bật công bố để hiện dòng FTC tại đây'}</div>
+    </div>
+  )
+}
+
 export function AffiliatePage() {
   const qc = useQueryClient()
   const products = useQuery({ queryKey: ['afproducts'], queryFn: api.afProducts })
@@ -182,6 +230,7 @@ export function AffiliatePage() {
   const [dropOver, setDropOver] = useState('')
   const [dragScript, setDragScript] = useState<string | null>(null)
   const [overScript, setOverScript] = useState<string | null>(null)
+  const [hookId, setHookId] = useState<string | null>(null)
 
   const scripts = useQuery({ queryKey: ['afscripts', sel], queryFn: () => api.afScripts(sel), enabled: !!sel })
   const videos = useQuery({
@@ -203,7 +252,11 @@ export function AffiliatePage() {
   })
   const genScript = useMutation({
     mutationFn: () => api.afCreateScript(sel, style),
-    onSuccess: () => { setMsg(''); qc.invalidateQueries({ queryKey: ['afscripts', sel] }) },
+    onSuccess: (res) => {
+      setMsg('')
+      setHookId(res.data.id)
+      qc.invalidateQueries({ queryKey: ['afscripts', sel] })
+    },
     onError: (e) => setMsg((e as Error).message),
   })
   const genVideo = async (scriptId: string) => {
@@ -216,17 +269,17 @@ export function AffiliatePage() {
     catch (e) { setMsg((e as Error).message) }
     qc.invalidateQueries({ queryKey: ['afvideos', sel] })
   }
-  const reviseVideo = async (videoId: string, message: string): Promise<string> => {
-    const res = await api.afReviseScript(videoId, message)
-    qc.invalidateQueries({ queryKey: ['afscripts', sel] })
-    return `AI đã viết lại kịch bản mới. Nhấn Dựng video để dựng lại từ bản mới.`
-  }
   const doExport = async (videoId: string) => {
     try {
       const res = await api.afExportVideo(videoId)
       setMsg(`Đã xuất tệp: ${res.data.manifest.file}`)
     } catch (e) { setMsg((e as Error).message) }
     qc.invalidateQueries({ queryKey: ['afvideos', sel] })
+  }
+  const setTone = async (productId: string, tone: string) => {
+    try { await api.afPatchProduct(productId, { tone }); setMsg('') }
+    catch (e) { setMsg((e as Error).message) }
+    qc.invalidateQueries({ queryKey: ['afproducts'] })
   }
 
   const dropImage = async (productId: string, file: File | undefined) => {
@@ -253,14 +306,24 @@ export function AffiliatePage() {
     setOverScript(null)
   }
 
+  const reviseVideo = async (videoId: string, message: string): Promise<string> => {
+    const res = await api.afReviseScript(videoId, message)
+    qc.invalidateQueries({ queryKey: ['afscripts', sel] })
+    setHookId(res.data.id)
+    return 'AI đã viết lại kịch bản mới. Nhấn Dựng video để dựng lại từ bản mới.'
+  }
+
   const selected = products.data?.data.find((p) => p.id === sel)
   const scriptList = [...(scripts.data?.data ?? [])].sort((a, b) => a.position - b.position)
+  const hook = scriptList.find((s) => s.id === hookId) ?? scriptList[0] ?? null
+  const videoList = videos.data?.data ?? []
+  const focusVideo = [...videoList].reverse().find((v) => v.has_video || v.status === 'RENDERING' || v.status === 'FAILED') ?? null
 
   return (
     <div className="space-y-5">
       <PageHeader title="Affiliate Factory" sub="Sản phẩm → Kịch bản → Video → Xem trước → Xuất tệp · không tự đăng" />
-      <div className="grid items-start gap-3 lg:grid-cols-5">
-        <div className="space-y-3 lg:col-span-2">
+      <div className="affil-layout">
+        <div className="space-y-3">
           <Card>
             <h2 className="section-title mb-2.5">Sản phẩm ({products.data?.data.length ?? '…'})</h2>
             {(products.data?.data.length ?? 0) === 0 ? <EmptyState icon="◍" title="Chưa có sản phẩm nào." /> : (
@@ -314,17 +377,88 @@ export function AffiliatePage() {
               <p className="text-[11px] text-muted">{t('affiliate.drop.image')}</p>
             </div>
           </Card>
+
+          {selected ? (
+            <Card>
+              <h2 className="section-title mb-2">Giọng điệu</h2>
+              <div className="flex flex-wrap gap-1.5">
+                {TONES.map((tone) => (
+                  <button
+                    key={tone}
+                    onClick={() => void setTone(selected.id, tone)}
+                    aria-pressed={selected.tone === tone}
+                    className={`rounded-lg border px-2.5 py-1.5 text-[12px] font-medium transition-colors duration-hover ${
+                      selected.tone === tone
+                        ? 'border-pink/50 bg-pink/10 text-ink'
+                        : 'border-border bg-panel text-secondary hover:text-ink'
+                    }`}
+                  >
+                    {tone}
+                  </button>
+                ))}
+              </div>
+            </Card>
+          ) : null}
         </div>
 
-        <div className="space-y-3 lg:col-span-3">
+        <div className="min-w-0 space-y-4">
           {!sel ? (
             <EmptyState icon="→" title="Chọn một sản phẩm để bắt đầu." />
           ) : (
             <>
+              <div className="affil-stage">
+                <StagePhone product={selected} script={hook} video={focusVideo} />
+                <div className="min-w-0 flex-1 space-y-3.5">
+                  <div className="info-block">
+                    <p className="k">Hook đề xuất · chọn 1</p>
+                    {scriptList.length === 0 ? (
+                      <p className="text-[12px] text-muted">Chưa có kịch bản — tạo ở khung bên dưới.</p>
+                    ) : scriptList.slice(0, 3).map((s) => (
+                      <div
+                        key={s.id}
+                        role="button"
+                        tabIndex={0}
+                        onClick={() => setHookId(s.id)}
+                        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') setHookId(s.id) }}
+                        className={`hook-opt ${hook?.id === s.id ? 'on' : ''}`}
+                      >
+                        <span className="radio" aria-hidden="true" />
+                        <span>{s.hook || s.body.slice(0, 90)}</span>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="info-block">
+                    <p className="k">Đang chọn</p>
+                    <p className="text-[12.5px] leading-relaxed text-secondary">
+                      {hook ? `${hook.body.slice(0, 140)}${hook.body.length > 140 ? '…' : ''}` : 'Chưa có kịch bản.'}
+                    </p>
+                    <div className="mt-2.5 flex flex-wrap gap-2">
+                      <Btn
+                        variant="accent"
+                        size="sm"
+                        disabled={!hook}
+                        onClick={() => { if (hook) void genVideo(hook.id) }}
+                      >
+                        Tạo video từ kịch bản này
+                      </Btn>
+                      <Btn size="sm" busy={analyze.isPending} disabled={analyze.isPending} onClick={() => analyze.mutate()}>
+                        Phân tích bằng AI
+                      </Btn>
+                    </div>
+                  </div>
+                  <div className="ftc-panel">
+                    <span className="ico" aria-hidden="true">⚖</span>
+                    <div className="body">
+                      <p className="title">Công bố tiếp thị liên kết</p>
+                      <p className="desc">{hook?.disclosure || 'Bật để chèn dòng công bố vào video và metadata. Yêu cầu bắt buộc ở nhiều nền tảng.'}</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
               <Card>
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <h2 className="section-title">{selected?.name}</h2>
-                  <Btn size="sm" busy={analyze.isPending} disabled={analyze.isPending} onClick={() => analyze.mutate()}>Phân tích bằng AI</Btn>
                 </div>
                 {selected?.image_path ? (
                   <img
@@ -341,6 +475,7 @@ export function AffiliatePage() {
                 </div>
                 {msg ? <p className="mt-2 rounded-lg bg-panel px-2.5 py-2 text-xs text-secondary">{msg}</p> : null}
               </Card>
+
               <h3 className="section-title">Kịch bản ({scriptList.length})</h3>
               <p className="text-[11px] text-muted">{t('affiliate.scripts.reorder.hint')}</p>
               {scriptList.map((s, i) => (
@@ -364,17 +499,17 @@ export function AffiliatePage() {
                       {s.disclosure_injected
                         ? <span className="badge badge-warn">Đã chèn công bố</span>
                         : <span className="badge badge-ok">Có công bố</span>}
+                      {hook?.id === s.id ? <span className="badge badge-accent">Đang chọn</span> : null}
                     </div>
                     <p className="mt-1.5 font-semibold">{s.hook}</p>
                     <p className="mt-1 text-sm text-secondary">{s.body}</p>
                     <p className="mt-1 text-sm text-ember">{s.cta}</p>
                     <p className="mt-1.5 rounded-lg bg-panel px-2.5 py-2 text-xs text-secondary">{s.disclosure}</p>
-                    <Btn variant="link" onClick={() => genVideo(s.id)} className="mt-2">Tạo video từ kịch bản này →</Btn>
                   </div>
                 </Card>
               ))}
-              <h3 className="section-title">Video ({videos.data?.data.length ?? 0})</h3>
-              {(videos.data?.data ?? []).map((v) => (
+
+              <h3 className="section-title">Video ({videoList.length})</h3>              {videoList.map((v) => (
                 <VideoJobCard
                   key={v.id}
                   v={v}
