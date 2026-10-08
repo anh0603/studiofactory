@@ -122,7 +122,10 @@ def compose_scene(image: Path, audio: Path | None, subtitle: Path | None,
     vf = f"scale={width}:{height}:force_original_aspect_ratio=increase," \
          f"crop={width}:{height}"
     cmd += ["-vf", vf, "-c:v", "libx264", "-pix_fmt", "yuv420p",
-            "-t", f"{max(duration_s, 0.5):.2f}"]
+            "-t", f"{max(duration_s, 0.5):.2f}",
+            # Faststart: moov before mdat so browsers start playback
+            # immediately instead of hanging on the first frame.
+            "-movflags", "+faststart"]
     if audio is not None:
         cmd += ["-c:a", "aac"]
     if subtitle is not None:
