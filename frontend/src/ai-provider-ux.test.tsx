@@ -3,6 +3,7 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { AiModelsPage } from './pages/ai-models'
+import { guessCapabilities, expandCapabilities } from './pages/ai-models'
 import { AiRouterPage } from './pages/ai-router'
 import { DiagnosticsPage } from './pages/diagnostics'
 
@@ -249,6 +250,38 @@ describe('capability test states', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Kiểm tra năng lực' }))
     await waitFor(() => expect(screen.getByText(/Đã xác thực/)).toBeTruthy())
     expect(screen.getByText(/generation NOT verified/)).toBeTruthy()
+  })
+})
+
+describe('capability auto-detect', () => {
+  it('guesses media capabilities from the model id', () => {
+    expect(guessCapabilities('black-forest-labs/flux-schnell', '')).toEqual(['IMAGE'])
+    expect(guessCapabilities('gemini-2.5-flash-preview-tts', '')).toEqual(['TTS'])
+    expect(guessCapabilities('text-embedding-3-small', '')).toEqual(['EMBEDDING'])
+  })
+
+  it('gives chat models story too, and vision models text', () => {
+    expect(guessCapabilities('llama-3.3-70b', '')).toEqual(['TEXT', 'STORY'])
+    expect(guessCapabilities('gemini-2.5-flash', '')).toEqual(['TEXT', 'STORY', 'VISION'])
+  })
+
+  it('expands a manual pick the same way', () => {
+    expect(expandCapabilities('TEXT')).toEqual(['TEXT', 'STORY'])
+    expect(expandCapabilities('STORY')).toEqual(['STORY'])
+    expect(expandCapabilities('IMAGE')).toEqual(['IMAGE'])
+  })
+
+  it('shows the guess in the form as the code is typed', async () => {
+    mockApi({
+      '/ai/providers': () => [provider()],
+      '/ai/models': () => [],
+    })
+    renderModels()
+    await waitFor(() => expect(screen.getAllByText(/OpenRouter/).length).toBeGreaterThan(0))
+    fireEvent.change(screen.getByLabelText('Mã mô hình'), { target: { value: 'flux-schnell' } })
+    await waitFor(() => expect(
+      screen.getByText((_c, el) => el?.tagName === 'P' && /Web tự nhận/.test(el.textContent ?? '')),
+    ).toHaveTextContent(/Hình ảnh/))
   })
 })
 

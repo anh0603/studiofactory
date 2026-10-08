@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Plus } from 'lucide-react'
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { api } from '../api/client'
 import { ExplainError } from '../components/explain-error'
 import { EmptyState, ErrorState } from '../components/states'
@@ -65,6 +65,32 @@ function logoFor(name: string): { initials: string; grad: string } {
 const PAID_BLOCKED = new Set(['PAID', 'TRIAL', 'UNKNOWN'])
 const COMMERCIAL_OK = new Set(['VERIFIED_COMMERCIAL'])
 
+/**
+ * Guess capabilities from a vendor model id so the operator never has to
+ * pick them by hand. Chat models do story too (same endpoint, same skill),
+ * vision models also do text. Image/audio models stand alone. Shown as a
+ * suggestion — the manual select stays for override.
+ */
+export function guessCapabilities(modelId: string, name: string): string[] {
+  const s = `${modelId} ${name}`.toLowerCase()
+  if (/(dall-e|gpt-image|flux|sdxl|stable-diffusion|imagen|midjourney|kandinsky|sd3|image)/.test(s))
+    return ['IMAGE']
+  if (/(^|[\W_])(tts|text-to-speech|speech|voice|xtts|sovits|bark|melotts|aura)([\W_]|$)/.test(s))
+    return ['TTS']
+  if (/embed/.test(s)) return ['EMBEDDING']
+  if (/(music|musicgen|audio-ldm)/.test(s)) return ['MUSIC']
+  if (/(vision|vl-|multimodal|gpt-4o|gpt-4\.1|claude|gemini|qwen.*vl|llama.*vision)/.test(s))
+    return ['TEXT', 'STORY', 'VISION']
+  return ['TEXT', 'STORY']
+}
+
+/** Companion expansion for a manually picked primary capability. */
+export function expandCapabilities(primary: string): string[] {
+  if (primary === 'VISION') return ['TEXT', 'STORY', 'VISION']
+  if (primary === 'TEXT') return ['TEXT', 'STORY']
+  return [primary]
+}
+
 function blockedReasons(cost: string, lic: string): string[] {
   const out: string[] = []
   if (PAID_BLOCKED.has(cost)) {
@@ -103,6 +129,8 @@ export function AiModelsPage() {
   const [mName, setMName] = useState('')
   const [mId, setMId] = useState('')
   const [mCap, setMCap] = useState('TEXT')
+  const [showCapSelect, setShowCapSelect] = useState(false)
+  const capTouched = useRef(false)
   const [mCost, setMCost] = useState('FREE')
   const [mLic, setMLic] = useState('VERIFIED_COMMERCIAL')
   const [mPriority, setMPriority] = useState('100')
@@ -146,10 +174,10 @@ export function AiModelsPage() {
   const createModel = useMutation({
     mutationFn: () => api.createModel({
       provider_id: mProvider, name: mName.trim(), model_id: (mId.trim() || mName.trim()),
-      capabilities: [mCap], cost_class: mCost, license_status: mLic,
+      capabilities: expandCapabilities(mCap), cost_class: mCost, license_status: mLic,
       priority: Number(mPriority) || 100,
     }),
-    onSuccess: () => { setMName(''); setMId(''); refresh() },
+    onSuccess: () => { setMName(''); setMId(''); capTouched.current = false; refresh() },
   })
   const toggleModel = useMutation({
     mutationFn: (m: { id: string; enabled: boolean }) => api.patchModel(m.id, { enabled: !m.enabled }),
@@ -471,11 +499,40 @@ export function AiModelsPage() {
           </Select>
           <div className="grid gap-2 sm:grid-cols-2">
             <Field aria-label="Tên mô hình" value={mName} onChange={(e) => setMName(e.target.value)} placeholder="Tên hiển thị" />
-            <Field aria-label="Mã mô hình" value={mId} onChange={(e) => setMId(e.target.value)} placeholder="mã gửi tới nhà cung cấp" />
+            <Field
+              aria-label="Mã mô hình"
+              value={mId}
+              onChange={(e) => {
+                const v = e.target.value
+                setMId(v)
+                if (!capTouched.current) {
+                  const g = guessCapabilities(v, mName)
+                  if (g[0] !== mCap) setMCap(g[0])
+                }
+              }}
+              placeholder="mã gửi tới nhà cung cấp"
+            />
           </div>
-          <Select aria-label="Năng lực" value={mCap} onChange={(e) => setMCap(e.target.value)}>
-            {Object.entries(CAPS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
-          </Select>
+          <div className="rounded-lg border border-border bg-panel px-3 py-2">
+            <p className="text-[13px]">
+              <span className="text-muted">Web tự nhận năng lực: </span>
+              <span className="font-semibold">
+                {expandCapabilities(mCap).map((c) => CAPS[c] ?? c).join(' + ')}
+              </span>{' '}
+              <Btn variant="link" onClick={() => setShowCapSelect((s) => !s)}>
+                {showCapSelect ? 'ẩn' : 'đổi'}
+              </Btn>
+            </p>
+            <div hidden={!showCapSelect} className="mt-2">
+              <Select
+                aria-label="Năng lực"
+                value={mCap}
+                onChange={(e) => { capTouched.current = true; setMCap(e.target.value) }}
+              >
+                {Object.entries(CAPS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+              </Select>
+            </div>
+          </div>
           <div hidden={!showModelCustom}>
             <div className="grid gap-2 sm:grid-cols-3">
               <Select aria-label="Lớp chi phí" value={mCost} onChange={(e) => setMCost(e.target.value)}>
