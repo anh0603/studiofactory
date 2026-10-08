@@ -294,6 +294,11 @@ export const api = {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({}),
     }),
+  afAutoVideo: (productId: string, scriptId: string) =>
+    request<{ request_id: string; data: AfVideo }>(`/api/v1/affiliate/products/${productId}/auto-video`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ script_id: scriptId }),
+    }),
   afReviseScript: (videoId: string, message: string) =>
     request<{ request_id: string; data: AfScript }>(`/api/v1/affiliate/videos/${videoId}/revise`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },

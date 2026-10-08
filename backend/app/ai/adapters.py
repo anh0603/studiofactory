@@ -26,6 +26,7 @@ class AdapterRequest:
     prompt: str = ""
     model_id: str = ""
     timeout_s: float = 20.0
+    images: list[str] = field(default_factory=list)  # data: URLs for vision input
 
 
 @dataclass
@@ -183,9 +184,15 @@ class OpenAICompatibleAdapter(ProviderAdapter):
         import json as _json
 
         started = time.monotonic()
+        content: object = request.prompt
+        if request.images:
+            # OpenAI vision shape: text + image_url blocks. The router only
+            # routes here when a VISION-capable model was selected.
+            content = [{"type": "text", "text": request.prompt}] + [
+                {"type": "image_url", "image_url": {"url": u}} for u in request.images[:4]]
         body = _json.dumps({
             "model": request.model_id,
-            "messages": [{"role": "user", "content": request.prompt}],
+            "messages": [{"role": "user", "content": content}],
             # Structured outputs (Director Plan JSON) need headroom; a low cap
             # truncates them mid-JSON into INVALID_RESPONSE. Vietnamese output
             # is token-hungry, so allow up to 8k. Phase B.

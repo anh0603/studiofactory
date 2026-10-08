@@ -269,6 +269,18 @@ export function AffiliatePage() {
     catch (e) { setMsg((e as Error).message) }
     qc.invalidateQueries({ queryKey: ['afvideos', sel] })
   }
+  const [autoBusy, setAutoBusy] = useState(false)
+  const autoVideo = async (scriptId: string) => {
+    if (autoBusy) return
+    setAutoBusy(true)
+    setMsg('')
+    try {
+      await api.afAutoVideo(sel, scriptId)
+      setMsg('AI đang tự dựng video: nhận diện → lên cảnh → vẽ → đọc → ghép.')
+    } catch (e) { setMsg((e as Error).message) }
+    setAutoBusy(false)
+    qc.invalidateQueries({ queryKey: ['afvideos', sel] })
+  }
   const renderVideo = async (videoId: string) => {
     try { await api.afRenderVideo(videoId); setMsg('') }
     catch (e) { setMsg((e as Error).message) }
@@ -548,6 +560,14 @@ export function AffiliatePage() {
                     <div className="mt-2.5 flex flex-wrap gap-2">
                       <Btn
                         variant="accent"
+                        size="sm"
+                        busy={autoBusy}
+                        disabled={!hook || autoBusy}
+                        onClick={() => { if (hook) void autoVideo(hook.id) }}
+                      >
+                        Tạo video AI tự động
+                      </Btn>
+                      <Btn
                         size="sm"
                         disabled={!hook}
                         onClick={() => { if (hook) void genVideo(hook.id) }}

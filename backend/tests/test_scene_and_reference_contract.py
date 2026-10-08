@@ -148,7 +148,10 @@ def test_reference_is_stored_but_generation_does_not_read_it(client):
 
 
 def test_router_contract_cannot_carry_media_reference():
-    """Document the contract gap precisely: RouteInput/AdapterRequest are text-only."""
+    """RouteInput/AdapterRequest are text-only, EXCEPT the explicit `images`
+    allow-list: a bounded list (max 4) of data-URL strings for VISION_ANALYSIS
+    only. Raw bytes, file paths/objects, reference ids and plain URLs stay
+    forbidden — character-reference smuggling stays impossible."""
     from app.ai.adapters import AdapterRequest
     from app.ai.router import RouteInput
 
@@ -156,4 +159,5 @@ def test_router_contract_cannot_carry_media_reference():
         fields = set(getattr(cls, "__dataclass_fields__", {}))
         leaked = {f for f in fields
                   if any(k in f.lower() for k in ("image", "reference", "bytes", "file", "url"))}
-        assert not leaked, f"{cls.__name__} unexpectedly carries media fields: {leaked}"
+        assert leaked <= {"images"}, (
+            f"{cls.__name__} unexpectedly carries media fields: {leaked}")

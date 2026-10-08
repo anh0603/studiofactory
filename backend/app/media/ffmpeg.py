@@ -106,7 +106,7 @@ def run(args: list[str], timeout_s: float = 120.0,
 def compose_scene(image: Path, audio: Path | None, subtitle: Path | None,
                   out: Path, duration_s: float, width: int = 720,
                   height: int = 1280, timeout_s: float = 120.0,
-                  on_progress: object = None) -> None:
+                  on_progress: object = None, overlay: Path | None = None) -> None:
     """Still-image + audio (+srt) -> mp4. Raises on failure.
 
     Subtitles are muxed as a real mov_text stream (selectable subtitles),
@@ -116,26 +116,47 @@ def compose_scene(image: Path, audio: Path | None, subtitle: Path | None,
 
     The still image gets a subtle slow push-in (zoompan 1.0 -> 1.12) so the
     video has real motion instead of a frozen frame under running audio.
+
+    overlay: optional real product photo composited bottom-right (240px).
+    Used by affiliate auto-video so the actual product stays on screen while
+    AI scenes play behind it.
     """
     frames = max(int(max(duration_s, 0.5) * 25), 1)
     cmd: list[str] = ["-loop", "1", "-framerate", "25", "-i", str(image)]
+    # Input order is fixed: 0=image, then audio, subtitle, overlay.
+    audio_idx = 1 if audio is not None else None
     if audio is not None:
         cmd += ["-i", str(audio)]
+    sub_idx = (2 if audio is not None else 1) if subtitle is not None else None
     if subtitle is not None:
         cmd += ["-i", str(subtitle)]
-    vf = (f"scale=1440:2560:force_original_aspect_ratio=increase,"
-          f"crop=1440:2560,"
-          f"zoompan=z='1+0.12*on/{frames}':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)'"
-          f":d=1:s={width}x{height}:fps=25")
-    cmd += ["-vf", vf, "-c:v", "libx264", "-pix_fmt", "yuv420p",
-            "-t", f"{max(duration_s, 0.5):.2f}",
-            # Faststart: moov before mdat so browsers start playback
-            # immediately instead of hanging on the first frame.
-            "-movflags", "+faststart"]
+    ov_idx: int | None = None
+    if overlay is not None:
+        ov_idx = sum(1 for present in (True, audio is not None, subtitle is not None) if present)
+        cmd += ["-loop", "1", "-framerate", "25", "-i", str(overlay)]
+    zoom = (f"scale=1440:2560:force_original_aspect_ratio=increase,"
+            f"crop=1440:2560,"
+            f"zoompan=z='1+0.12*on/{frames}':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)'"
+            f":d=1:s={width}x{height}:fps=25")
+    if ov_idx is None:
+        # Explicit maps: once any -map is present, automatic stream
+        # selection is off and the video would silently vanish.
+        cmd += ["-vf", zoom, "-map", "0:v", "-c:v", "libx264", "-pix_fmt", "yuv420p",
+                "-t", f"{max(duration_s, 0.5):.2f}",
+                # Faststart: moov before mdat so browsers start playback
+                # immediately instead of hanging on the first frame.
+                "-movflags", "+faststart"]
+    else:
+        fc = (f"[0:v]{zoom}[bg];[{ov_idx}:v]scale=240:-1[ov];"
+              f"[bg][ov]overlay=W-w-24:H-h-24:format=yuv420[out]")
+        cmd += ["-filter_complex", fc, "-map", "[out]",
+                "-c:v", "libx264", "-pix_fmt", "yuv420p",
+                "-t", f"{max(duration_s, 0.5):.2f}",
+                "-movflags", "+faststart"]
     if audio is not None:
-        cmd += ["-c:a", "aac"]
+        cmd += ["-map", f"{audio_idx}:a", "-c:a", "aac"]
     if subtitle is not None:
-        cmd += ["-c:s", "mov_text"]
+        cmd += ["-map", f"{sub_idx}:s", "-c:s", "mov_text"]
     if audio is not None:
         cmd += ["-shortest"]
     cmd.append(str(out))

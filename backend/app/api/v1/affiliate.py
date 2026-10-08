@@ -1,7 +1,7 @@
 """Affiliate Factory: products / images / analysis / scripts / videos / export.
 
 Isolated from Story by construction: no story FKs, no shared tables, own
-storage jail, own Router calls (TEXT/IMAGE only). Default workflow has NO
+storage jail, own Router calls (TEXT/IMAGE/VISION). Default workflow has NO
 autopilot/scheduler/publisher involvement.
 """
 from __future__ import annotations
@@ -556,9 +556,63 @@ def render_video(video_id: str, body: RenderIn, request: Request,
     return {"request_id": rid, "data": _video_out(v, script)}
 
 
+def _first_json_object(text: str) -> dict:
+    """Parse the FIRST complete JSON object, ignoring chatter before/after.
+    Local to affiliate auto-video; shared extract_json stays strict."""
+    import json as _json
+    if not isinstance(text, str):
+        raise ValueError("empty model output")
+    start = text.find("{")
+    if start < 0:
+        raise ValueError("no JSON object in model output")
+    obj, _ = _json.JSONDecoder().raw_decode(text[start:])
+    if not isinstance(obj, dict):
+        raise ValueError("not a JSON object")
+    return obj
+
+
 class ReviseIn(BaseModel):
     message: str = Field(min_length=1, max_length=2000)
     strategy: str = "AUTO"
+
+
+def _router_vision(db, prompt: str, image_data_url: str, request_id: str,
+                   ) -> tuple[str, str, str, bool, list]:
+    """VISION-capability Router call with one product photo. Returns
+    output/provider/model/mock/attempts. Raises AppError on failure."""
+    from .ai import store as get_store
+    r = Router()
+    models = [{
+        "id": m.id, "provider_id": m.provider_id, "credential_ref": m.credential_ref,
+        "name": m.name, "model_id": m.model_id, "capabilities": m.capabilities,
+        "priority": m.priority, "enabled": m.enabled, "cost_class": m.cost_class,
+        "license_status": m.license_status, "health_status": m.health_status,
+        "metadata": m.extra_metadata or {},
+    } for m in db.scalars(select(M.AIModel)).all()]
+    providers = {p.id: {"id": p.id, "name": p.name, "base_url": p.base_url,
+                        "adapter_key": p.adapter_key, "enabled": p.enabled}
+                 for p in db.scalars(select(M.AIProvider)).all()}
+    st = get_store()
+    refs = {c.ref for c in db.scalars(select(M.Credential)).all() if st.exists(c.ref)}
+    secrets = {ref: st.get(ref) for ref in refs}
+    result = r.route(models, providers, secrets, refs, RouteInput(
+        task="VISION_ANALYSIS", capability="VISION", prompt=prompt,
+        strategy="AUTO", images=[image_data_url], max_attempts=2,
+        timeout_s=120.0), request_id)
+    from ...ai.usage import record_routing
+    mock_any = record_routing(db, request_id=request_id, task="VISION_ANALYSIS",
+                              capability="VISION", result=result,
+                              providers=providers, models=models)
+    db.flush()
+    if not result.ok:
+        db.commit()
+        raise AppError(result.error_code or "UNKNOWN_ERROR",
+                       result.error_message or "vision analysis failed.",
+                       {"MODEL_UNAVAILABLE": 404, "CREDENTIAL_MISSING": 409,
+                        "PAID_MODEL_BLOCKED": 402, "LICENSE_BLOCKED": 403}.get(
+                           result.error_code, 502))
+    last = result.attempts[-1]
+    return result.output, last.provider, last.model, mock_any, result.attempts
 
 
 @router.post("/affiliate/videos/{video_id}/revise", status_code=201)
@@ -605,6 +659,186 @@ def revise_script(video_id: str, body: ReviseIn, request: Request,
     s.position = max([x.position for x in siblings], default=-1) + 1
     db.commit()
     return {"request_id": rid, "data": _script_out(s)}
+
+
+class AutoVideoIn(BaseModel):
+    strategy: str = "AUTO"
+
+
+@router.post("/affiliate/products/{product_id}/auto-video", status_code=201)
+def auto_video(product_id: str, body: dict, request: Request,
+               db: Session = Depends(get_db)) -> dict:
+    """User uploads ONE product photo; AI does everything else.
+
+    1. VISION identifies the product (category, look, colors).
+    2. TEXT plans 3 scenes (visual prompt + spoken caption each).
+    3. Per scene: AI image + TTS caption + FFmpeg compose with the REAL
+       product photo composited bottom-right.
+    4. Concat scenes -> one vertical MP4 + sidecar SRT.
+    Honest 4xx/502 at the exact failing step; nothing is faked.
+    """
+    from ...ai.director import extract_json
+    from ...media.ffmpeg import concat as _concat
+    from ...media.pipeline import PipelineError, generate_bytes
+    from ...media.validate import MediaInvalid, build_srt, validate_audio, validate_image
+    rid = _rid(request)
+    script_id = (body or {}).get("script_id", "")
+    p = _get_product(db, product_id)
+    script = db.get(M.AffiliateScript, script_id)
+    if script is None or script.product_id != p.id:
+        raise AppError("BAD_REQUEST", "script not in product", 400)
+    if not p.image_path:
+        raise AppError("VALIDATION_FAILED",
+                       "Upload a product photo first; AI builds from it.", 422)
+    storage = _storage()
+    storage.ensure_affiliate(p.id)
+    try:
+        img_path = storage.resolve_affiliate(p.id, p.image_path)
+        img_bytes = img_path.read_bytes()
+    except Exception:  # noqa: BLE001
+        raise AppError("NOT_FOUND", "Product image missing on disk.", 404)
+    import base64 as _b64
+    data_url = f"data:image/png;base64,{_b64.b64encode(img_bytes).decode()}"
+    v = M.AffiliateVideo(id=f"afv_{uuid.uuid4().hex[:12]}", product_id=p.id,
+                         script_id=script.id, status="RENDERING", progress=2)
+    db.add(v)
+    db.commit()
+
+    def _set_progress(pct: int) -> None:
+        try:
+            row = db.get(M.AffiliateVideo, v.id)
+            if row is not None and pct > (row.progress or 0):
+                row.progress = pct
+                db.commit()
+        except Exception:  # noqa: BLE001 - progress is best-effort
+            try:
+                db.rollback()
+            except Exception:  # noqa: BLE001
+                pass
+
+    def _fail(code: str, message: str, status: int) -> None:
+        v.status = "FAILED"
+        db.commit()
+        raise AppError(code, message, status)
+
+    try:
+        # 1. Identify the product from its photo.
+        out, _, _, _, _ = _router_vision(
+            db, "Nhìn ảnh sản phẩm và trả về MỘT object JSON duy nhất: "
+                '{"category": "...", "look": "...", "colors": "..."}. '
+                "Toàn bộ giá trị bằng TIẾNG VIỆT.", data_url, rid)
+        try:
+            identify = _first_json_object(out)
+            if not isinstance(identify, dict) or not identify.get("category"):
+                raise ValueError("identify shape mismatch")
+        except ValueError as exc:
+            _fail("INVALID_RESPONSE", f"AI could not identify the product ({exc}).", 502)
+        _set_progress(12)
+        # 2. AI plans 3 scenes.
+        look = f"{identify.get('category', '')} {identify.get('look', '')}".strip()
+        out2, _, _, _, _ = _router_text(
+            db, "Lập kế hoạch 3 cảnh video dọc cho sản phẩm này. Chỉ trả về MỘT "
+                "object JSON duy nhất: "
+                '{"scenes": [{"visual_prompt": "...(English, product photo style)...", '
+                '"caption": "...(TIẾNG VIỆT, one spoken line)...", "duration": 5}]}. '
+                f"Sản phẩm: {look}. Mô tả: {p.description}. "
+                f"Kịch bản tham khảo: {script.hook} {script.body} {script.cta}",
+            rid, "AUTO", None)
+        try:
+            plan = _first_json_object(out2)
+            raw_scenes = plan["scenes"][:3]
+            assert isinstance(raw_scenes, list) and raw_scenes
+            scenes = []
+            for sc in raw_scenes:
+                # Models sometimes return bare strings; wrap them honestly.
+                if isinstance(sc, str):
+                    sc = {"visual_prompt": sc, "caption": sc, "duration": 5}
+                assert isinstance(sc.get("visual_prompt"), str) and isinstance(sc.get("caption"), str)
+                try:
+                    sc_dur = float(sc.get("duration", 5) or 5)
+                except (TypeError, ValueError):
+                    sc_dur = 5.0
+                sc["duration"] = min(max(sc_dur, 2.0), 30.0)
+                scenes.append(sc)
+        except (ValueError, KeyError, AssertionError, TypeError, AttributeError) as exc:
+            _fail("INVALID_RESPONSE", f"AI scene plan malformed ({exc}).", 502)
+        # 3. Render each scene: AI image + TTS + compose + product overlay.
+        from pathlib import Path as _Path
+        import tempfile as _tf
+        scene_files: list[str] = []
+        srt_cues: list[tuple[float, float, str]] = []
+        cursor = 0.0
+        for i, sc in enumerate(scenes):
+            _set_progress(15 + int(70 * i / max(len(scenes), 1)))
+            img_prompt = (f"{sc['visual_prompt']}, featuring {look}, "
+                          "vertical product video still")
+            try:
+                scene_img, _imime, _ = generate_bytes(
+                    "IMAGE", img_prompt, db, rid, "AUTO", None, False, False)
+                validate_image(scene_img)
+            except (PipelineError, MediaInvalid) as exc:
+                code = getattr(exc, "code", "UNKNOWN_ERROR")
+                _fail(code, f"scene {i + 1} image failed: {str(exc)[:200]}",
+                      {"PAID_MODEL_BLOCKED": 402, "LICENSE_BLOCKED": 403}.get(code, 502))
+            try:
+                audio, _, _ = generate_bytes(
+                    "TTS", sc["caption"], db, rid, "AUTO", None, False, False)
+                _amime, dur = validate_audio(audio)
+                if dur <= 0:
+                    raise MediaInvalid("tts audio has no duration")
+            except (PipelineError, MediaInvalid) as exc:
+                code = getattr(exc, "code", "UNKNOWN_ERROR")
+                _fail(code, f"scene {i + 1} voice failed: {str(exc)[:200]}",
+                      {"PAID_MODEL_BLOCKED": 402, "LICENSE_BLOCKED": 403}.get(code, 502))
+            with _tf.TemporaryDirectory() as tmp:
+                t = _Path(tmp)
+                (t / "bg.png").write_bytes(scene_img)
+                (t / "au.wav").write_bytes(audio)
+                cue = build_srt([(0.0, dur, sc["caption"][:200])])
+                (t / "cu.srt").write_text(cue, encoding="utf-8")
+                rel = f"videos/{v.id}_s{i}.mp4"
+
+                def _cb(frac: float, base: int = 15 + int(70 * i / max(len(scenes), 1))) -> None:
+                    _set_progress(min(95, base + int(frac * (70 / max(len(scenes), 1)))))
+
+                try:
+                    from ...media.ffmpeg import compose_scene
+                    compose_scene(t / "bg.png", t / "au.wav", t / "cu.srt",
+                                  storage.resolve_affiliate(p.id, rel), dur,
+                                  on_progress=_cb, overlay=img_path,
+                                  timeout_s=180.0)
+                except Exception as exc:  # noqa: BLE001 - ffmpeg/io failure
+                    _fail("RENDER_FAILED", f"scene {i + 1} render failed: {type(exc).__name__}", 502)
+            scene_files.append(rel)
+            srt_cues.append((cursor, cursor + dur, sc["caption"][:200]))
+            cursor += dur
+        # 4. Concat + sidecar subtitles.
+        _set_progress(96)
+        rel_sub = f"videos/{v.id}.srt"
+        storage.resolve_affiliate(p.id, rel_sub).write_text(
+            build_srt(srt_cues), encoding="utf-8")
+        out_rel = f"videos/{v.id}.mp4"
+        import tempfile as _tf2
+        with _tf2.TemporaryDirectory() as tmp2:
+            parts = []
+            for j, rel in enumerate(scene_files):
+                dst = _Path(tmp2) / f"part_{j:03}.mp4"
+                dst.write_bytes(storage.resolve_affiliate(p.id, rel).read_bytes())
+                parts.append(dst)
+            _concat(parts, storage.resolve_affiliate(p.id, out_rel))
+    except AppError:
+        raise
+    except Exception as exc:  # noqa: BLE001 - honest terminal failure
+        _fail("UNKNOWN_ERROR", f"auto video failed: {type(exc).__name__}", 500)
+    v.video_path = out_rel
+    v.duration_s = cursor
+    v.progress = 100
+    v.status = "READY"
+    v.export_manifest = {"auto": True, "identify": identify,
+                         "scenes": [{"file": r, "caption": srt_cues[k][2]} for k, r in enumerate(scene_files)],
+                         "srt": rel_sub}
+    db.commit()
+    return {"request_id": rid, "data": _video_out(v, script)}
 
 
 @router.get("/affiliate/products/{product_id}/videos")

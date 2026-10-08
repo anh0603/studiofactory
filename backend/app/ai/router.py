@@ -26,6 +26,7 @@ class RouteInput:
     job_id: str | None = None
     max_attempts: int = 3
     timeout_s: float = 20.0
+    images: list = field(default_factory=list)  # data: URLs, vision only
 
 
 @dataclass
@@ -152,7 +153,7 @@ class Router:
             t0 = time.monotonic()
             res = adapter.generate(AdapterRequest(task=inp.task, capability=inp.capability,
                                                   prompt=inp.prompt, model_id=m.get("model_id", ""),
-                                                  timeout_s=inp.timeout_s), secret)
+                                                  timeout_s=inp.timeout_s, images=list(inp.images or [])), secret)
             result.network_calls += 0 if res.mock and provider.get("adapter_key") == "test" else 1
             latency = res.latency_ms or int((time.monotonic() - t0) * 1000)
             if res.ok:
@@ -221,7 +222,8 @@ class Router:
             t0 = time.monotonic()
             res = adapter.generate_media(kind, AdapterRequest(
                 task=inp.task, capability=inp.capability, prompt=inp.prompt,
-                model_id=m.get("model_id", ""), timeout_s=inp.timeout_s), secret)
+                model_id=m.get("model_id", ""), timeout_s=inp.timeout_s,
+                images=list(inp.images or [])), secret)
             result.network_calls += 0 if res.mock and provider.get("adapter_key") == "test" else 1
             latency = res.latency_ms or int((time.monotonic() - t0) * 1000)
             if res.ok:
