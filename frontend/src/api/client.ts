@@ -269,6 +269,13 @@ export const api = {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ script_id: scriptId, generate_visual: visual }),
     }),
+  afRenderVideo: (videoId: string) =>
+    request<{ request_id: string; data: AfVideo }>(`/api/v1/affiliate/videos/${videoId}/render`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({}),
+    }),
+  affiliateFileUrl: (videoId: string) =>
+    `/api/v1/affiliate/videos/${videoId}/file/content`,
   afExportVideo: (videoId: string) =>
     request<{ request_id: string; data: { manifest: { file: string } } }>(
       `/api/v1/affiliate/videos/${videoId}/export`, { method: 'POST' }),
@@ -416,6 +423,9 @@ export interface AfVideo {
   status: string
   visual_artifact_id: string | null
   script_id: string
+  video_path?: string | null
+  has_video?: boolean
+  duration_s?: number | null
 }
 
 export interface AnalyticsOverview {

@@ -348,6 +348,8 @@ class VideoIn(BaseModel):
 def _video_out(v: M.AffiliateVideo, script: M.AffiliateScript | None = None) -> dict:
     return {"id": v.id, "product_id": v.product_id, "script_id": v.script_id,
             "status": v.status, "visual_artifact_id": v.visual_artifact_id,
+            "video_path": v.video_path or None,
+            "has_video": bool(v.video_path), "duration_s": v.duration_s,
             "export_manifest": v.export_manifest,
             "script": _script_out(script) if script else None,
             "created_at": v.created_at, "updated_at": v.updated_at}
@@ -391,6 +393,96 @@ def create_video(product_id: str, body: VideoIn, request: Request,
         v.status = "READY"
     else:
         v.status = "READY"
+    db.commit()
+    return {"request_id": rid, "data": _video_out(v, script)}
+
+
+class RenderIn(BaseModel):
+    strategy: str = "AUTO"
+
+
+@router.post("/affiliate/videos/{video_id}/render", status_code=200)
+def render_video(video_id: str, body: RenderIn, request: Request,
+                 db: Session = Depends(get_db)) -> dict:
+    """Narration (script hook+body+cta) -> TTS -> FFmpeg slideshow MP4.
+
+    Visual: script video visual first, else product image. Honest 422 when
+    no image or no speakable text. Never a fake/silent video.
+    """
+    from ...media.ffmpeg import compose_scene, require as ffmpeg_require
+    from ...media.pipeline import PipelineError, generate_bytes
+    from ...media.validate import MediaInvalid, build_srt, validate_audio
+    rid = _rid(request)
+    v = db.get(M.AffiliateVideo, video_id)
+    if v is None:
+        raise AppError("NOT_FOUND", "Video not found.", 404)
+    p = _get_product(db, v.product_id)
+    script = db.get(M.AffiliateScript, v.script_id)
+    storage = _storage()
+    storage.ensure_affiliate(p.id)
+    img_rel = v.visual_artifact_id or p.image_path or ""
+    if not img_rel:
+        raise AppError("VALIDATION_FAILED",
+                       "Render needs a product image or a generated visual first.", 422)
+    try:
+        img_path = storage.resolve_affiliate(p.id, img_rel)
+    except PathJailError:
+        raise AppError("BAD_REQUEST", "invalid image path", 400)
+    if not img_path.is_file():
+        raise AppError("NOT_FOUND", "Image file missing on disk.", 404)
+    narration = " ".join(t for t in
+                          [script.hook if script else "", script.body if script else "",
+                           script.cta if script else ""] if t.strip())
+    if not narration.strip():
+        raise AppError("VALIDATION_FAILED", "Script has no speakable text.", 422)
+    v.status = "RENDERING"
+    db.commit()
+    try:
+        ffmpeg_require()
+    except Exception:  # noqa: BLE001
+        v.status = "FAILED"
+        db.commit()
+        raise AppError("FFMPEG_UNAVAILABLE", "FFmpeg binary not found.", 502)
+    from pathlib import Path as _Path
+    import tempfile as _tf
+    tmp_audio: str | None = None
+    try:
+        data, _mime, meta = generate_bytes(
+            "TTS", narration, db, rid, body.strategy, None, False, False)
+        audio_bytes = data
+        with _tf.NamedTemporaryFile(suffix=".wav", delete=False) as f:
+            f.write(audio_bytes)
+            tmp_audio = f.name
+        mime, dur = validate_audio(audio_bytes)
+        if dur <= 0:
+            raise MediaInvalid("tts audio has no duration")
+        srt = build_srt([(0.0, dur, narration[:500])])
+        rel_sub = f"videos/{v.id}.srt"
+        storage.resolve_affiliate(p.id, rel_sub).write_text(srt, encoding="utf-8")
+        out_rel = f"videos/{v.id}.mp4"
+        out_path = storage.resolve_affiliate(p.id, out_rel)
+        compose_scene(img_path, _Path(tmp_audio),
+                      storage.resolve_affiliate(p.id, rel_sub),
+                      out_path, dur)
+    except (PipelineError, MediaInvalid) as exc:
+        v.status = "FAILED"
+        db.commit()
+        code = getattr(exc, "code", "UNKNOWN_ERROR")
+        raise AppError(code, str(exc)[:300],
+                       {"PAID_MODEL_BLOCKED": 402, "LICENSE_BLOCKED": 403}.get(code, 502))
+    except Exception as exc:  # noqa: BLE001 - ffmpeg/io failure, honest
+        v.status = "FAILED"
+        db.commit()
+        raise AppError("RENDER_FAILED", f"Render failed: {type(exc).__name__}", 502)
+    finally:
+        try:
+            if tmp_audio:
+                _Path(tmp_audio).unlink(missing_ok=True)
+        except Exception:  # noqa: BLE001
+            pass
+    v.video_path = out_rel
+    v.duration_s = dur
+    v.status = "READY"
     db.commit()
     return {"request_id": rid, "data": _video_out(v, script)}
 
@@ -446,7 +538,8 @@ def export_video(video_id: str, request: Request,
                    "body": script.body, "cta": script.cta,
                    "disclosure": script.disclosure,
                    "disclosure_injected": script.disclosure_injected},
-        "visual": v.visual_artifact_id, "product_image": p.image_path,
+        "visual": v.visual_artifact_id, "video": v.video_path or None,
+        "duration_s": v.duration_s, "product_image": p.image_path,
         "auto_publish": False, "request_id": rid,
     }
     storage = _storage()

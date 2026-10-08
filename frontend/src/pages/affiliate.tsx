@@ -5,6 +5,7 @@ import { api } from '../api/client'
 import type { AfScript } from '../api/client'
 import { EmptyState } from '../components/states'
 import { Btn, Card, Field, PageHeader, Select, StatusBadge } from '../components/ui'
+import { VideoPlayer } from '../components/player'
 import { t } from '../i18n/strings.vi'
 
 const STYLES: Record<string, string> = {
@@ -46,6 +47,11 @@ export function AffiliatePage() {
   })
   const genVideo = async (scriptId: string) => {
     try { await api.afCreateVideo(sel, scriptId, false); setMsg('') }
+    catch (e) { setMsg((e as Error).message) }
+    qc.invalidateQueries({ queryKey: ['afvideos', sel] })
+  }
+  const renderVideo = async (videoId: string) => {
+    try { await api.afRenderVideo(videoId); setMsg('') }
     catch (e) { setMsg((e as Error).message) }
     qc.invalidateQueries({ queryKey: ['afvideos', sel] })
   }
@@ -208,6 +214,17 @@ export function AffiliatePage() {
                     <span className="mono">{v.id.slice(0, 12)}</span>
                     <span className="flex items-center gap-2">
                       <StatusBadge value={v.status} />
+                      {v.has_video ? (
+                        <a
+                          href={api.affiliateFileUrl(v.id)}
+                          download={`${v.id}.mp4`}
+                          className="link-accent text-[13px]"
+                        >
+                          Tải video
+                        </a>
+                      ) : (
+                        <Btn variant="link" onClick={() => renderVideo(v.id)}>Dựng video</Btn>
+                      )}
                       <a
                         href={api.affiliateVisualUrl(v.id)}
                         download={`${v.id}.png`}
@@ -218,13 +235,21 @@ export function AffiliatePage() {
                       <Btn variant="link" onClick={() => doExport(v.id)}>Xuất tệp</Btn>
                     </span>
                   </div>
-                  <img
-                    src={api.affiliateVisualUrl(v.id)}
-                    alt=""
-                    aria-hidden="true"
-                    className="max-h-48 w-full rounded-lg border border-border object-cover"
-                    onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }}
-                  />
+                  {v.has_video ? (
+                    <VideoPlayer
+                      src={api.affiliateFileUrl(v.id)}
+                      title={`${v.id.slice(0, 12)}${v.duration_s ? ` · ${v.duration_s.toFixed(1)}s` : ''}`}
+                      downloadName={`${v.id}.mp4`}
+                    />
+                  ) : (
+                    <img
+                      src={api.affiliateVisualUrl(v.id)}
+                      alt=""
+                      aria-hidden="true"
+                      className="max-h-48 w-full rounded-lg border border-border object-cover"
+                      onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }}
+                    />
+                  )}
                 </div>
               ))}
             </>

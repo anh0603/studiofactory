@@ -147,3 +147,15 @@ def affiliate_visual_content(video_id: str, request: Request,
         raise AppError("NOT_FOUND", "Video not found.", 404)
     path, mime = _affiliate_file(v.product_id, v.visual_artifact_id, db)
     return _range_response(path, mime, request)
+
+
+@router.api_route("/affiliate/videos/{video_id}/file/content",
+                  methods=["GET", "HEAD"])
+def affiliate_video_content(video_id: str, request: Request,
+                            db: Session = Depends(get_db)):
+    """Rendered affiliate MP4 (Range-capable, same player as story)."""
+    v = db.get(M.AffiliateVideo, _check_id(video_id, "video"))
+    if v is None:
+        raise AppError("NOT_FOUND", "Video not found.", 404)
+    path, mime = _affiliate_file(v.product_id, v.video_path or None, db)
+    return _range_response(path, mime, request)

@@ -378,6 +378,8 @@ class AffiliateVideo(Base, TimestampMixin):
     script_id: Mapped[str] = mapped_column(ForeignKey("affiliate_scripts.id"))
     status: Mapped[str] = mapped_column(String(32), default="DRAFT")
     visual_artifact_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    video_path: Mapped[str] = mapped_column(String(1024), default="")
+    duration_s: Mapped[float] = mapped_column(Float, default=0.0)
     export_manifest: Mapped[dict] = mapped_column(JSON, default=dict)
 
 

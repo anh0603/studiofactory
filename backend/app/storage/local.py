@@ -77,7 +77,7 @@ class LocalStorage:
 
     def ensure_affiliate(self, product_id: str) -> Path:
         base = self.affiliate_dir(product_id)
-        for sub in ("images", "visuals", "exports", "logs"):
+        for sub in ("images", "visuals", "videos", "exports", "logs"):
             (base / sub).mkdir(parents=True, exist_ok=True)
         return base
 

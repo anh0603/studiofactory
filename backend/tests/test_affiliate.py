@@ -46,6 +46,8 @@ def make_client(tmp_path, monkeypatch):
     from types import SimpleNamespace as NS
     import app.core.config as cfg
     monkeypatch.setattr(aff, "settings", NS(projects_root=str(tmp_path / "p")))
+    import app.api.v1.files as files_mod
+    monkeypatch.setattr(files_mod, "settings", NS(projects_root=str(tmp_path / "p")))
     A._ADAPTERS.clear()
     A._ADAPTERS["test"] = A.TestAdapter()
     return TestClient(app), TS
@@ -183,3 +185,51 @@ def test_affiliate_visual_generation_and_isolation(tmp_path, monkeypatch):
     assert client.get("/api/v1/projects").json()["data"] == []
     assert "sk-x" not in client.get(
         f"/api/v1/affiliate/videos/{v['id']}/preview").text
+
+def _aff_video(client, product_id, with_image=True):
+    from helpers import valid_png_bytes as _png
+    if with_image:
+        client.post(f"/api/v1/affiliate/products/{product_id}/image",
+                    files={"file": ("p.png", _png(), "image/png")})
+    A._ADAPTERS["test"].queue(True, json.dumps({
+        "hook": "H", "body": "Great buds for bass lovers.", "cta": "Buy now",
+        "disclosure": "Paid review."}))
+    s = client.post(f"/api/v1/affiliate/products/{product_id}/scripts",
+                    json={"style": "REVIEW"}).json()["data"]
+    v = client.post(f"/api/v1/affiliate/products/{product_id}/videos",
+                    json={"script_id": s["id"], "generate_visual": False}).json()["data"]
+    return v
+
+
+def test_affiliate_render_validation(tmp_path, monkeypatch):
+    client, _ = make_client(tmp_path, monkeypatch)
+    assert client.post("/api/v1/affiliate/videos/afv_nope/render", json={}).status_code == 404
+    setup_ai(client, caps=("TEXT",))
+    p = client.post("/api/v1/affiliate/products", json={"name": "Earbuds"}).json()["data"]
+    v = _aff_video(client, p["id"], with_image=False)
+    res = client.post(f"/api/v1/affiliate/videos/{v['id']}/render", json={})
+    assert res.status_code == 422  # no image anywhere
+    assert "image" in res.json()["error"]["message"].lower()
+
+
+def test_affiliate_render_success(tmp_path, monkeypatch):
+    import shutil as _sh
+    from helpers import data_url, valid_wav_bytes as _wav
+    if _sh.which("ffmpeg") is None:
+        import pytest as _pt
+        _pt.skip("needs ffmpeg")
+    client, _ = make_client(tmp_path, monkeypatch)
+    setup_ai(client, caps=("TEXT", "TTS"))
+    p = client.post("/api/v1/affiliate/products", json={"name": "Earbuds"}).json()["data"]
+    v = _aff_video(client, p["id"], with_image=True)
+    A._ADAPTERS["test"].queue_media(True, data_url("audio/wav", _wav(1.0)))
+    res = client.post(f"/api/v1/affiliate/videos/{v['id']}/render", json={})
+    assert res.status_code == 200, res.text
+    data = res.json()["data"]
+    assert data["status"] == "READY" and data["has_video"] is True
+    assert data["video_path"].endswith(".mp4") and data["duration_s"] > 0
+    # Served bytes are a real MP4.
+    vid = client.get(f"/api/v1/affiliate/videos/{v['id']}/file/content")
+    assert vid.status_code == 200
+    assert vid.headers["content-type"] == "video/mp4"
+    assert vid.content[4:8] == b"ftyp"

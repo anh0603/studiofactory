@@ -1,0 +1,20 @@
+{
+  "video_id": "afv_297a8ca36fa1",
+  "product": {
+    "id": "afp_c98fcc4fc226",
+    "name": "áo thun",
+    "affiliate_url": ""
+  },
+  "script": {
+    "style": "REVIEW",
+    "hook": "Hey everyone, today I'm trying out this super comfortable áo thun that promises softness and style—let's see if it lives up to the hype!",
+    "body": "The fabric feels incredibly soft against the skin, and the stitching looks solid with no loose threads. It fits true to size, offering a relaxed yet flattering silhouette that works for both casual outings and layering under a jacket. The color stays vibrant after a few washes, and there's minimal shrinkage. Overall, it's a great everyday tee that delivers on comfort and durability without breaking the bank.",
+    "cta": "If you liked this review, hit the link below to grab yours now and don't forget to subscribe for more fashion finds!",
+    "disclosure": "This video contains affiliate links, and I may earn a commission if you purchase through the link provided.",
+    "disclosure_injected": false
+  },
+  "visual": null,
+  "product_image": null,
+  "auto_publish": false,
+  "request_id": "req_ed2f1c81861b458e"
+}
