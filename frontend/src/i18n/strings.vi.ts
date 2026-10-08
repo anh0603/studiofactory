@@ -49,6 +49,11 @@ export const strings = {
   'settings.theme.dark': 'Tối',
   'affiliate.drop.image': 'Kéo thả ảnh sản phẩm vào đây',
   'affiliate.scripts.reorder.hint': 'Kéo thẻ để đổi thứ tự kịch bản.',
+  'ai.preset.title': 'Chọn nhanh dịch vụ phổ biến',
+  'ai.preset.hint': 'Chỉ điền sẵn địa chỉ giúp bạn — khoá API vẫn là của bạn, nhập ở bước sau.',
+  'ai.provider.what': 'Nhà cung cấp là nơi bạn thuê AI (ví dụ: OpenRouter, Google). Bạn tự tạo tài khoản ở đó rồi dán khoá vào đây.',
+  'ai.model.what': 'Mô hình là “con AI” cụ thể và việc nó làm được: viết truyện, vẽ hình, đọc giọng…',
+  'ai.test.what': 'Bấm Kiểm tra năng lực để web gọi thử thật một lần, biết ngay có dùng được không.',
 } as const
 
 export type StringKey = keyof typeof strings

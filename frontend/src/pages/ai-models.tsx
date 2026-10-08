@@ -5,7 +5,7 @@ import { api } from '../api/client'
 import { ExplainError } from '../components/explain-error'
 import { EmptyState, ErrorState } from '../components/states'
 import { Btn, Card, Field, PageHeader, Select, Spinner, StatusBadge } from '../components/ui'
-import { errorCodeVi, statusVi } from '../i18n/strings.vi'
+import { errorCodeVi, statusVi, t as tr } from '../i18n/strings.vi'
 
 const CAPS: Record<string, string> = {
   TEXT: 'Văn bản', STORY: 'Truyện', VISION: 'Thị giác', IMAGE: 'Hình ảnh',
@@ -45,6 +45,14 @@ const LOGO_GRADS = [
   'linear-gradient(135deg,#ec4899,#f59e0b)',
   'linear-gradient(135deg,#fbbf24,#f97316)',
   'linear-gradient(135deg,#34d399,#22d3ee)',
+]
+
+/** One-tap presets: public base URLs only. The key is always the user's own. */
+const PRESETS = [
+  { name: 'OpenRouter', url: 'https://openrouter.ai/api/v1', adapter: 'openai_compatible' },
+  { name: 'Google Gemini', url: 'https://generativelanguage.googleapis.com/v1beta/openai/', adapter: 'openai_compatible' },
+  { name: 'Groq', url: 'https://api.groq.com/openai/v1', adapter: 'groq' },
+  { name: 'Together', url: 'https://api.together.xyz/v1', adapter: 'together' },
 ]
 
 function logoFor(name: string): { initials: string; grad: string } {
@@ -300,6 +308,30 @@ export function AiModelsPage() {
               <Btn variant="link" onClick={() => setShowAdd(false)}>Đóng</Btn>
             ) : null}
           </div>
+          <p className="mb-2.5 text-[13px] text-secondary">{tr('ai.provider.what')}</p>
+          <p className="mb-1.5 text-[11px] font-bold uppercase tracking-[0.09em] text-secondary">{tr('ai.preset.title')}</p>
+          <div className="mb-2.5 grid grid-cols-2 gap-1.5 sm:grid-cols-4">
+            {PRESETS.map((preset) => {
+              const logo = logoFor(preset.name)
+              return (
+                <button
+                  key={preset.name}
+                  onClick={() => { setPName(preset.name); setPUrl(preset.url); setPAdapter(preset.adapter) }}
+                  className="flex items-center gap-2 rounded-lg border border-border bg-panel px-2.5 py-2 text-left transition-colors duration-hover hover:border-accent"
+                >
+                  <span
+                    aria-hidden="true"
+                    className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-[11px] font-bold text-white"
+                    style={{ background: logo.grad }}
+                  >
+                    {logo.initials}
+                  </span>
+                  <span className="truncate text-[12px] font-semibold">{preset.name}</span>
+                </button>
+              )
+            })}
+          </div>
+          <p className="mb-2.5 text-[11px] text-muted">{tr('ai.preset.hint')}</p>
           <div className="space-y-2">
             <Field
               aria-label="Tên nhà cung cấp"
@@ -340,7 +372,8 @@ export function AiModelsPage() {
       ) : null}
 
       <Card>
-        <h2 className="section-title mb-2.5">Mô hình ({modelList.length})</h2>
+        <h2 className="section-title mb-1">Mô hình ({modelList.length})</h2>
+        <p className="mb-2.5 text-[13px] text-secondary">{tr('ai.model.what')}</p>
         {modelList.length === 0 ? (
           <EmptyState icon="◇" title="Chưa có mô hình nào." hint="Thêm mô hình cùng năng lực, chi phí và giấy phép để bộ định tuyến dùng được." />
         ) : (
@@ -394,6 +427,7 @@ export function AiModelsPage() {
                     <Btn variant="link" busy={t?.state === 'PENDING'} onClick={() => runTest(m.id)}>Kiểm tra năng lực</Btn>
                     <Btn variant="link" onClick={() => deleteModel.mutate(m.id)}>Xoá</Btn>
                   </div>
+                  <p className="mt-1 text-[11px] text-muted">{tr('ai.test.what')}</p>
                 </li>
               )
             })}
