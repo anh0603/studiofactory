@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { GripVertical, ImagePlus, Send } from 'lucide-react'
-import { useState } from 'react'
+import { GripVertical, ImagePlus, Send, Upload } from 'lucide-react'
+import { useRef, useState } from 'react'
 import { api } from '../api/client'
 import type { AfProduct, AfScript, AfVideo } from '../api/client'
 import { EmptyState } from '../components/states'
@@ -231,6 +231,9 @@ export function AffiliatePage() {
   const [dragScript, setDragScript] = useState<string | null>(null)
   const [overScript, setOverScript] = useState<string | null>(null)
   const [hookId, setHookId] = useState<string | null>(null)
+  const [upBusy, setUpBusy] = useState(false)
+  const [upErr, setUpErr] = useState('')
+  const fileRef = useRef<HTMLInputElement>(null)
 
   const scripts = useQuery({ queryKey: ['afscripts', sel], queryFn: () => api.afScripts(sel), enabled: !!sel })
   const videos = useQuery({
@@ -290,6 +293,17 @@ export function AffiliatePage() {
       setMsg('')
       qc.invalidateQueries({ queryKey: ['afproducts'] })
     } catch (e) { setMsg((e as Error).message) }
+  }
+
+  const pickImage = async (productId: string, file: File | undefined) => {
+    if (!file) return
+    setUpErr('')
+    if (!file.type.startsWith('image/')) { setUpErr('Chỉ nhận tệp hình ảnh (PNG/JPG).'); return }
+    setUpBusy(true)
+    try {
+      await api.afUploadImage(productId, file)
+      qc.invalidateQueries({ queryKey: ['afproducts'] })
+    } catch (e) { setUpErr((e as Error).message) } finally { setUpBusy(false) }
   }
 
   const moveScript = async (id: string, toIndex: number) => {
@@ -380,6 +394,55 @@ export function AffiliatePage() {
 
           {selected ? (
             <Card>
+              <h2 className="section-title mb-2">Ảnh sản phẩm</h2>
+              <div
+                onDragOver={(e) => { e.preventDefault(); setDropOver(selected.id) }}
+                onDragLeave={() => setDropOver('')}
+                onDrop={(e) => {
+                  e.preventDefault()
+                  setDropOver('')
+                  void dropImage(selected.id, e.dataTransfer.files?.[0])
+                }}
+                className={`rounded-xl border border-dashed p-3 text-center transition-colors ${dropOver === selected.id ? 'border-accent bg-tint' : 'border-border bg-panel'}`}
+              >
+                {selected.image_path ? (
+                  <img
+                    src={api.affiliateImageUrl(selected.id)}
+                    alt={selected.name}
+                    className="mx-auto max-h-36 rounded-lg border border-border object-cover"
+                  />
+                ) : (
+                  <ImagePlus className="mx-auto h-6 w-6 text-muted" aria-hidden="true" />
+                )}
+                <input
+                  ref={fileRef}
+                  type="file"
+                  accept="image/*"
+                  aria-label="Chọn ảnh sản phẩm từ máy"
+                  className="hidden"
+                  onChange={(e) => {
+                    void pickImage(selected.id, e.target.files?.[0])
+                    e.target.value = ''
+                  }}
+                />
+                <Btn
+                  size="sm"
+                  busy={upBusy}
+                  disabled={upBusy}
+                  onClick={() => fileRef.current?.click()}
+                  className="mt-2"
+                >
+                  <Upload className="h-3.5 w-3.5" aria-hidden="true" />
+                  Tải ảnh lên
+                </Btn>
+                <p className="mt-1.5 text-[11px] text-muted">Bấm để chọn file, hoặc kéo thả ảnh vào đây</p>
+                {upErr ? <p className="mt-1 text-[12px] text-bad">{upErr}</p> : null}
+              </div>
+            </Card>
+          ) : null}
+
+          {selected ? (
+            <Card>
               <h2 className="section-title mb-2">Giọng điệu</h2>
               <div className="flex flex-wrap gap-1.5">
                 {TONES.map((tone) => (
@@ -406,11 +469,24 @@ export function AffiliatePage() {
             <EmptyState icon="→" title="Chọn một sản phẩm để bắt đầu." />
           ) : (
             <>
+              <Card>
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <h2 className="section-title">1 · Tạo kịch bản cho {selected?.name}</h2>
+                </div>
+                <div className="mt-2.5 flex flex-col gap-2 sm:flex-row">
+                  <Select aria-label="Kiểu kịch bản" value={style} onChange={(e) => setStyle(e.target.value)} className="sm:max-w-52">
+                    {Object.entries(STYLES).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+                  </Select>
+                  <Btn variant="accent" busy={genScript.isPending} disabled={genScript.isPending} onClick={() => genScript.mutate()} className="flex-1">Tạo kịch bản</Btn>
+                </div>
+                {msg ? <p className="mt-2 rounded-lg bg-panel px-2.5 py-2 text-xs text-secondary">{msg}</p> : null}
+              </Card>
+
               <div className="affil-stage">
                 <StagePhone product={selected} script={hook} video={focusVideo} />
                 <div className="min-w-0 flex-1 space-y-3.5">
                   <div className="info-block">
-                    <p className="k">Hook đề xuất · chọn 1</p>
+                    <p className="k">2 · Sân khấu — Hook đề xuất · chọn 1</p>
                     {scriptList.length === 0 ? (
                       <p className="text-[12px] text-muted">Chưa có kịch bản — tạo ở khung bên dưới.</p>
                     ) : scriptList.slice(0, 3).map((s) => (
@@ -428,8 +504,7 @@ export function AffiliatePage() {
                     ))}
                   </div>
                   <div className="info-block">
-                    <p className="k">Đang chọn</p>
-                    <p className="text-[12.5px] leading-relaxed text-secondary">
+                    <p className="k">Đang chọn</p>                    <p className="text-[12.5px] leading-relaxed text-secondary">
                       {hook ? `${hook.body.slice(0, 140)}${hook.body.length > 140 ? '…' : ''}` : 'Chưa có kịch bản.'}
                     </p>
                     <div className="mt-2.5 flex flex-wrap gap-2">
@@ -456,27 +531,7 @@ export function AffiliatePage() {
                 </div>
               </div>
 
-              <Card>
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <h2 className="section-title">{selected?.name}</h2>
-                </div>
-                {selected?.image_path ? (
-                  <img
-                    src={api.affiliateImageUrl(selected.id)}
-                    alt={selected.name}
-                    className="mt-2.5 max-h-44 w-full rounded-xl border border-border object-cover"
-                  />
-                ) : null}
-                <div className="mt-2.5 flex flex-col gap-2 sm:flex-row">
-                  <Select aria-label="Kiểu kịch bản" value={style} onChange={(e) => setStyle(e.target.value)} className="sm:max-w-52">
-                    {Object.entries(STYLES).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
-                  </Select>
-                  <Btn variant="accent" busy={genScript.isPending} disabled={genScript.isPending} onClick={() => genScript.mutate()} className="flex-1">Tạo kịch bản</Btn>
-                </div>
-                {msg ? <p className="mt-2 rounded-lg bg-panel px-2.5 py-2 text-xs text-secondary">{msg}</p> : null}
-              </Card>
-
-              <h3 className="section-title">Kịch bản ({scriptList.length})</h3>
+              <h3 className="section-title">3 · Kịch bản ({scriptList.length})</h3>
               <p className="text-[11px] text-muted">{t('affiliate.scripts.reorder.hint')}</p>
               {scriptList.map((s, i) => (
                 <Card
@@ -509,7 +564,7 @@ export function AffiliatePage() {
                 </Card>
               ))}
 
-              <h3 className="section-title">Video ({videoList.length})</h3>              {videoList.map((v) => (
+              <h3 className="section-title">4 · Video ({videoList.length})</h3>              {videoList.map((v) => (
                 <VideoJobCard
                   key={v.id}
                   v={v}
