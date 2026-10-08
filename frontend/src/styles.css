@@ -1,10 +1,13 @@
 @import "tailwindcss";
 @config "../tailwind.config.ts";
-@import "@fontsource/be-vietnam-pro/400.css";
-@import "@fontsource/be-vietnam-pro/500.css";
-@import "@fontsource/be-vietnam-pro/600.css";
-@import "@fontsource/be-vietnam-pro/700.css";
-@import "@fontsource/be-vietnam-pro/800.css";
+@import "@fontsource/inter/400.css";
+@import "@fontsource/inter/500.css";
+@import "@fontsource/inter/600.css";
+@import "@fontsource/inter/700.css";
+@import "@fontsource/inter/800.css";
+@import "@fontsource/jetbrains-mono/400.css";
+@import "@fontsource/jetbrains-mono/500.css";
+@import "@fontsource/jetbrains-mono/700.css";
 
 /* Theme channels: "R G B". Light is default; .dark on <html> flips them. */
 :root {
@@ -16,7 +19,7 @@
   --c-elevated: 228 231 235;
   --c-chrome: 255 255 255;
   --c-border: 222 226 231;
-  --c-accent: 242 121 60;
+  --c-accent: 139 124 246;
   --c-on-accent: 255 255 255;
   --c-ink: 22 25 29;
   --c-secondary: 91 100 112;
@@ -25,6 +28,9 @@
   --c-warn: 154 107 18;
   --c-ok: 31 122 77;
   --c-bad: 192 54 44;
+  --c-cyan: 8 145 178;
+  --c-pink: 190 60 130;
+  --c-blue: 37 99 235;
   --c-tint: 254 243 232;
   --c-emberline: 240 201 168;
   --shadow-card: 0 1px 2px rgba(16, 24, 40, 0.06), 0 1px 3px rgba(16, 24, 40, 0.08);
@@ -39,8 +45,8 @@
   --c-elevated: 36 44 54;
   --c-chrome: 14 18 24;
   --c-border: 42 49 59;
-  --c-accent: 242 121 60;
-  --c-on-accent: 26 14 7;
+  --c-accent: 139 124 246;
+  --c-on-accent: 255 255 255;
   --c-ink: 237 239 243;
   --c-secondary: 168 177 191;
   --c-muted: 122 133 152;
@@ -48,6 +54,9 @@
   --c-warn: 232 176 75;
   --c-ok: 123 200 164;
   --c-bad: 224 122 106;
+  --c-cyan: 34 211 238;
+  --c-pink: 244 114 182;
+  --c-blue: 96 165 250;
   --c-tint: 34 22 16;
   --c-emberline: 122 64 32;
   --shadow-card: 0 1px 0 rgba(255, 255, 255, 0.025) inset;
@@ -58,8 +67,9 @@ body {
   color: rgb(var(--c-ink));
   font-size: 15px;
   line-height: 1.55;
-  font-family: "Be Vietnam Pro", system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  font-family: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   -webkit-font-smoothing: antialiased;
+  font-feature-settings: "cv02", "cv03", "cv04", "cv11";
 }
 a { color: inherit; }
 :focus-visible { outline: 2px solid rgb(var(--c-accent)); outline-offset: 2px; border-radius: 4px; }
@@ -107,12 +117,13 @@ a { color: inherit; }
   .btn:disabled { @apply cursor-not-allowed opacity-40; }
 
   .btn-accent {
-    @apply border border-accent/45 bg-accent;
+    border: 1px solid rgb(var(--c-accent));
+    background: linear-gradient(180deg, #9d8df7 0%, #7c6ce8 100%);
     color: rgb(var(--c-on-accent));
-    box-shadow: 0 1px 0 rgba(255,255,255,0.15) inset, 0 2px 8px -5px rgba(0,0,0,0.4);
+    box-shadow: 0 0 0 1px rgba(255,255,255,0.08) inset, 0 8px 24px -8px rgb(var(--c-accent) / 0.6);
   }
-  .btn-accent:hover:not(:disabled) { @apply bg-accent border-accent/70 brightness-110; }
-  .btn-accent:active:not(:disabled) { @apply brightness-95; }
+  .btn-accent:hover:not(:disabled) { @apply border-accent; filter: brightness(1.08); }
+  .btn-accent:active:not(:disabled) { filter: brightness(0.96); }
 
   .btn-ghost { @apply border border-border bg-raised text-ink hover:bg-elevated; }
   .btn-danger-ghost { @apply border border-border bg-transparent text-secondary hover:text-bad; }
@@ -153,6 +164,21 @@ a { color: inherit; }
     color: rgb(var(--c-bad));
   }
   .badge-info { @apply border-border bg-raised text-secondary; }
+  .badge-cyan {
+    border: 1px solid color-mix(in srgb, rgb(var(--c-cyan)) 32%, transparent);
+    background: color-mix(in srgb, rgb(var(--c-cyan)) 12%, transparent);
+    color: rgb(var(--c-cyan));
+  }
+  .badge-pink {
+    border: 1px solid color-mix(in srgb, rgb(var(--c-pink)) 32%, transparent);
+    background: color-mix(in srgb, rgb(var(--c-pink)) 12%, transparent);
+    color: rgb(var(--c-pink));
+  }
+  .badge-blue {
+    border: 1px solid color-mix(in srgb, rgb(var(--c-blue)) 32%, transparent);
+    background: color-mix(in srgb, rgb(var(--c-blue)) 12%, transparent);
+    color: rgb(var(--c-blue));
+  }
   .badge-accent {
     border: 1px solid rgb(var(--c-emberline));
     background: rgb(var(--c-tint));
@@ -171,7 +197,7 @@ a { color: inherit; }
   .grid-2 { @apply grid gap-3 md:grid-cols-2; }
   .grid-3 { @apply grid gap-3 md:grid-cols-3; }
   .grid-4 { @apply grid gap-3 sm:grid-cols-2 xl:grid-cols-4; }
-  .mono { @apply font-mono text-[12px]; }
+  .mono { @apply text-[12px]; font-family: "JetBrains Mono", ui-monospace, monospace; font-variant-numeric: tabular-nums; }
   .empty-icon {
     @apply mx-auto mb-2 flex h-11 w-11 items-center justify-center rounded-xl border border-border bg-panel text-lg text-secondary;
   }

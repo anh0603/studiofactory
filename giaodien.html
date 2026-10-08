@@ -1,0 +1,1559 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Studio — AI Video Workbench</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+/* ============ RESET ============ */
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{
+  font-family:'Inter',system-ui,sans-serif;
+  font-size:14px;line-height:1.55;
+  color:var(--t1);background:var(--bg0);
+  -webkit-font-smoothing:antialiased;
+  font-feature-settings:"cv02","cv03","cv04","cv11";
+  overflow:hidden;
+}
+button,input,textarea,select{font-family:inherit;font-size:inherit;color:inherit}
+button{background:none;border:none;cursor:pointer;color:inherit}
+::-webkit-scrollbar{width:10px;height:10px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:rgba(255,255,255,0.08);border-radius:6px;border:2px solid transparent;background-clip:padding-box}
+::-webkit-scrollbar-thumb:hover{background:rgba(255,255,255,0.16);background-clip:padding-box;border:2px solid transparent}
+::selection{background:rgba(139,124,246,0.35)}
+
+:root{
+  --bg0:#08090d; --bg1:#0d0f14; --bg2:#14161d; --bg3:#1c1f28; --bg4:#232733;
+  --line:rgba(255,255,255,0.06); --line-2:rgba(255,255,255,0.09); --line-3:rgba(255,255,255,0.14);
+  --t1:#f0f1f5; --t2:#9298a6; --t3:#5d6270;
+  --violet:#8b7cf6; --violet-2:#a78bfa; --cyan:#22d3ee; --pink:#f472b6;
+  --ok:#34d399; --warn:#fbbf24; --err:#f87171; --blue:#60a5fa;
+  --grad-brand:linear-gradient(135deg,#8b7cf6 0%,#22d3ee 100%);
+  --grad-warm:linear-gradient(135deg,#f472b6 0%,#fbbf24 100%);
+  --grad-ok:linear-gradient(135deg,#34d399 0%,#22d3ee 100%);
+  --r-sm:6px; --r:10px; --r-lg:14px; --r-xl:20px;
+  --shadow-sm:0 1px 2px rgba(0,0,0,0.3);
+  --shadow:0 4px 16px -4px rgba(0,0,0,0.5);
+  --shadow-lg:0 24px 48px -16px rgba(0,0,0,0.6);
+}
+.mono{font-family:'JetBrains Mono',monospace;font-variant-numeric:tabular-nums}
+
+/* ============ APP LAYOUT ============ */
+.app{display:grid;grid-template-columns:250px 1fr;height:100vh;overflow:hidden}
+
+/* ============ SIDEBAR ============ */
+.sidebar{background:var(--bg1);border-right:1px solid var(--line);display:flex;flex-direction:column;overflow:hidden}
+.brand{padding:20px 20px 16px;display:flex;align-items:center;gap:10px}
+.brand-mark{width:28px;height:28px;border-radius:8px;background:var(--grad-brand);position:relative;flex-shrink:0;box-shadow:0 0 24px -4px rgba(139,124,246,0.6)}
+.brand-mark::after{content:"";position:absolute;inset:8px;border-radius:2px;background:rgba(8,9,13,0.85)}
+.brand-name{font-size:14px;font-weight:600;letter-spacing:-0.01em}
+.brand-tag{font-size:10.5px;color:var(--t3);letter-spacing:0.08em;text-transform:uppercase;font-weight:500}
+
+.new-btn{margin:0 12px 18px;display:flex;align-items:center;gap:10px;padding:10px 14px;background:var(--bg2);border:1px solid var(--line-2);border-radius:var(--r);font-size:13.5px;font-weight:500;transition:all 0.15s;color:var(--t1)}
+.new-btn:hover{background:var(--bg3);border-color:var(--line-3)}
+.new-btn kbd{margin-left:auto;font-family:'JetBrains Mono',monospace;font-size:10px;padding:2px 6px;background:var(--bg0);border:1px solid var(--line-2);border-radius:4px;color:var(--t2)}
+.new-btn .plus{width:18px;height:18px;border-radius:5px;background:var(--grad-brand);display:grid;place-items:center;color:white;font-size:14px;font-weight:500;box-shadow:0 0 12px -2px rgba(139,124,246,0.6)}
+
+.nav-section{padding:14px 20px 6px;font-size:10.5px;font-weight:600;letter-spacing:0.1em;text-transform:uppercase;color:var(--t3)}
+.nav{padding:0 8px}
+.nav-item{display:flex;align-items:center;gap:11px;padding:8px 12px;border-radius:8px;font-size:13.5px;color:var(--t2);transition:all 0.12s;position:relative;cursor:pointer;user-select:none}
+.nav-item:hover{background:var(--bg2);color:var(--t1)}
+.nav-item.on{background:linear-gradient(90deg,rgba(139,124,246,0.14),rgba(139,124,246,0.02));color:var(--t1)}
+.nav-item.on::before{content:"";position:absolute;left:0;top:50%;transform:translateY(-50%);width:2px;height:16px;border-radius:2px;background:var(--violet);box-shadow:0 0 12px var(--violet)}
+.nav-item svg{width:16px;height:16px;flex-shrink:0;opacity:0.9}
+.nav-item .badge{margin-left:auto;font-size:10.5px;padding:2px 7px;border-radius:999px;background:var(--bg3);color:var(--t2);font-family:'JetBrains Mono',monospace;font-weight:500}
+.nav-item .badge.live{background:rgba(52,211,153,0.12);color:#6ee7b7;box-shadow:0 0 0 1px rgba(52,211,153,0.25) inset}
+.nav-item .badge.new{background:rgba(244,114,182,0.14);color:#fbcfe8;box-shadow:0 0 0 1px rgba(244,114,182,0.3) inset}
+
+.sidebar-foot{margin-top:auto;padding:14px 12px;border-top:1px solid var(--line)}
+.user{display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:8px;cursor:pointer;transition:background 0.12s}
+.user:hover{background:var(--bg2)}
+.user-av{width:28px;height:28px;border-radius:50%;background:linear-gradient(135deg,#f472b6,#fbbf24);display:grid;place-items:center;font-size:11px;font-weight:600;color:#1a0a0e}
+.user-info{flex:1;min-width:0}
+.user-name{font-size:12.5px;font-weight:500}
+.user-plan{font-size:10.5px;color:var(--t3)}
+
+/* ============ MAIN ============ */
+.main{display:flex;flex-direction:column;overflow:hidden;background:var(--bg0)}
+.topbar{height:56px;flex-shrink:0;display:flex;align-items:center;gap:16px;padding:0 24px;border-bottom:1px solid var(--line);background:rgba(8,9,13,0.7);backdrop-filter:blur(12px)}
+.crumb{font-size:13px;color:var(--t2);display:flex;align-items:center;gap:8px}
+.crumb b{color:var(--t1);font-weight:500}
+.crumb .sep{color:var(--t3)}
+.topbar-right{margin-left:auto;display:flex;align-items:center;gap:10px}
+.search{display:flex;align-items:center;gap:8px;padding:7px 10px 7px 12px;background:var(--bg1);border:1px solid var(--line-2);border-radius:9px;min-width:280px;font-size:12.5px;color:var(--t3);cursor:text;transition:all 0.15s}
+.search:hover{border-color:var(--line-3);background:var(--bg2)}
+.search svg{width:14px;height:14px}
+.search kbd{margin-left:auto;font-family:'JetBrains Mono',monospace;font-size:10px;padding:2px 6px;background:var(--bg0);border:1px solid var(--line-2);border-radius:4px;color:var(--t2)}
+.icon-btn{width:32px;height:32px;border-radius:8px;display:grid;place-items:center;color:var(--t2);border:1px solid transparent;transition:all 0.15s;position:relative}
+.icon-btn:hover{background:var(--bg2);color:var(--t1);border-color:var(--line-2)}
+.icon-btn svg{width:16px;height:16px}
+.icon-btn .dot{position:absolute;top:6px;right:6px;width:6px;height:6px;border-radius:50%;background:var(--ok);box-shadow:0 0 0 2px var(--bg0)}
+
+/* ============ VIEWS ============ */
+.view{display:none;flex:1;overflow:auto;padding:32px 40px 80px;animation:fadeIn 0.25s ease}
+.view.on{display:block}
+@keyframes fadeIn{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+
+/* ============ BUTTONS ============ */
+.btn{display:inline-flex;align-items:center;gap:8px;padding:8px 14px;border-radius:9px;font-size:13px;font-weight:500;border:1px solid var(--line-2);background:var(--bg2);color:var(--t1);transition:all 0.12s;cursor:pointer;white-space:nowrap}
+.btn:hover{background:var(--bg3);border-color:var(--line-3)}
+.btn svg{width:14px;height:14px}
+.btn.primary{background:linear-gradient(180deg,#9d8df7 0%,#7c6ce8 100%);border-color:#8b7cf6;color:#fff;box-shadow:0 0 0 1px rgba(255,255,255,0.08) inset,0 8px 24px -8px rgba(139,124,246,0.6)}
+.btn.primary:hover{filter:brightness(1.08)}
+.btn.success{background:linear-gradient(180deg,#34d399 0%,#10b981 100%);border-color:#34d399;color:#04170f;box-shadow:0 0 0 1px rgba(255,255,255,0.15) inset,0 8px 24px -8px rgba(52,211,153,0.6)}
+.btn.success:hover{filter:brightness(1.05)}
+.btn.danger{background:rgba(248,113,113,0.14);border-color:rgba(248,113,113,0.4);color:#fca5a5}
+.btn.ghost{background:transparent;border-color:transparent;color:var(--t2)}
+.btn.ghost:hover{background:var(--bg2);color:var(--t1)}
+.btn.sm{padding:6px 11px;font-size:12px}
+.btn.sm svg{width:13px;height:13px}
+
+/* ============ CHIPS ============ */
+.chip{display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:999px;font-size:11.5px;font-weight:500;background:var(--bg2);color:var(--t2);border:1px solid var(--line-2);white-space:nowrap}
+.chip.ok{background:rgba(52,211,153,0.10);color:#6ee7b7;border-color:rgba(52,211,153,0.28)}
+.chip.warn{background:rgba(251,191,36,0.10);color:#fcd34d;border-color:rgba(251,191,36,0.28)}
+.chip.err{background:rgba(248,113,113,0.10);color:#fca5a5;border-color:rgba(248,113,113,0.28)}
+.chip.info{background:rgba(34,211,238,0.10);color:#67e8f9;border-color:rgba(34,211,238,0.28)}
+.chip.violet{background:rgba(139,124,246,0.12);color:#c4b5fd;border-color:rgba(139,124,246,0.32)}
+.chip.pink{background:rgba(244,114,182,0.12);color:#fbcfe8;border-color:rgba(244,114,182,0.32)}
+.chip.blue{background:rgba(96,165,250,0.12);color:#93c5fd;border-color:rgba(96,165,250,0.32)}
+.chip .d{width:5px;height:5px;border-radius:50%;background:currentColor;box-shadow:0 0 8px currentColor}
+
+/* ============ CARD ============ */
+.card{background:var(--bg1);border:1px solid var(--line);border-radius:var(--r-lg);overflow:hidden}
+.card-head{display:flex;align-items:center;gap:10px;padding:14px 18px;border-bottom:1px solid var(--line);font-size:13px;font-weight:500}
+.card-head .right{margin-left:auto;display:flex;align-items:center;gap:8px}
+.card-head .sub{color:var(--t3);font-weight:400;font-size:12px}
+.card-body{padding:16px 18px}
+
+/* ============ STATS ============ */
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--line);border-radius:var(--r-lg);overflow:hidden;border:1px solid var(--line);margin-bottom:28px}
+.stat{background:var(--bg1);padding:18px 20px;position:relative;transition:background 0.15s}
+.stat:hover{background:var(--bg2)}
+.stat .k{font-size:11px;letter-spacing:0.08em;text-transform:uppercase;color:var(--t3);font-weight:600;margin-bottom:8px}
+.stat .v{font-size:22px;font-weight:600;letter-spacing:-0.02em;font-variant-numeric:tabular-nums}
+.stat .v small{font-size:13px;color:var(--t3);font-weight:400;margin-left:4px}
+.stat .hint{font-size:11.5px;color:var(--t3);margin-top:4px}
+.stat .hint.up{color:#6ee7b7}
+.stat .accent-bar{position:absolute;top:0;left:20px;right:20px;height:1px;background:var(--grad-brand);opacity:0;transition:opacity 0.2s}
+.stat:hover .accent-bar{opacity:0.7}
+
+/* ============ SECTION TITLE ============ */
+.sec-title{display:flex;align-items:baseline;gap:12px;margin-bottom:16px}
+.sec-title h2{font-size:15px;font-weight:600;letter-spacing:-0.01em}
+.sec-title .sub{font-size:12.5px;color:var(--t3)}
+.sec-title .right{margin-left:auto;font-size:12.5px;color:var(--t2);cursor:pointer}
+.sec-title .right:hover{color:var(--violet-2)}
+
+/* ============ PAGE HEAD ============ */
+.page-head{display:flex;align-items:flex-start;gap:16px;margin-bottom:24px}
+.page-head h1{font-size:22px;font-weight:600;letter-spacing:-0.02em;margin-bottom:4px}
+.page-head p{font-size:13px;color:var(--t2);margin:0}
+.page-head .actions{margin-left:auto;display:flex;gap:8px}
+
+/* ============ HOME ============ */
+.home-hero{position:relative;margin-bottom:36px;padding:8px 0 4px}
+.home-hero::before{content:"";position:absolute;top:-80px;left:20%;right:20%;height:280px;background:radial-gradient(ellipse at center,rgba(139,124,246,0.18),transparent 65%);filter:blur(60px);pointer-events:none;z-index:-1}
+.greet{font-size:12.5px;color:var(--t3);letter-spacing:0.02em;margin-bottom:6px}
+.greet b{color:var(--t2);font-weight:500}
+.hero-title{font-size:34px;font-weight:600;letter-spacing:-0.03em;line-height:1.15;margin-bottom:24px;max-width:680px}
+.hero-title em{font-style:normal;background:var(--grad-brand);-webkit-background-clip:text;background-clip:text;color:transparent}
+.prompt-wrap{position:relative;max-width:820px}
+.prompt-wrap::before{content:"";position:absolute;inset:-2px;border-radius:calc(var(--r-lg) + 4px);background:var(--grad-brand);opacity:0.28;filter:blur(20px);z-index:-1;animation:pulse 4s ease-in-out infinite}
+@keyframes pulse{0%,100%{opacity:0.22}50%{opacity:0.38}}
+.prompt{background:var(--bg1);border:1px solid var(--line-2);border-radius:var(--r-lg);padding:18px 20px;transition:border-color 0.2s}
+.prompt:focus-within{border-color:var(--line-3)}
+.prompt textarea{width:100%;background:transparent;border:none;outline:none;resize:none;font-size:15px;line-height:1.55;color:var(--t1);min-height:52px}
+.prompt textarea::placeholder{color:var(--t3)}
+.prompt-foot{display:flex;align-items:center;gap:8px;margin-top:14px;padding-top:14px;border-top:1px solid var(--line)}
+.prompt-foot .chips{display:flex;gap:6px;flex:1;flex-wrap:wrap}
+.prompt-foot .chips .chip{cursor:pointer}
+.prompt-foot .chips .chip:hover{background:var(--bg3);color:var(--t1)}
+
+/* Project cards */
+.projects-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:32px}
+.project-card{background:var(--bg1);border:1px solid var(--line);border-radius:var(--r-lg);overflow:hidden;transition:all 0.2s;cursor:pointer;position:relative}
+.project-card:hover{border-color:var(--line-3);transform:translateY(-2px);box-shadow:var(--shadow-lg)}
+.project-thumb{aspect-ratio:16/10;position:relative;overflow:hidden;background:var(--bg2)}
+.project-thumb .art{position:absolute;inset:0}
+.project-card:hover .play-overlay{opacity:1;transform:translate(-50%,-50%) scale(1)}
+.play-overlay{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%) scale(0.9);width:52px;height:52px;border-radius:50%;background:rgba(8,9,13,0.85);backdrop-filter:blur(8px);border:1px solid rgba(255,255,255,0.15);display:grid;place-items:center;opacity:0;transition:all 0.25s;color:white}
+.play-overlay svg{width:18px;height:18px;margin-left:2px}
+.project-dur{position:absolute;bottom:10px;right:10px;font-family:'JetBrains Mono',monospace;font-size:11px;padding:3px 7px;border-radius:5px;background:rgba(8,9,13,0.75);backdrop-filter:blur(6px);color:#fff}
+.project-body{padding:14px 16px}
+.project-title{font-size:13.5px;font-weight:500;margin-bottom:4px;display:flex;align-items:center;gap:8px}
+.project-title .status-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0}
+.project-title .status-dot.ok{background:var(--ok);box-shadow:0 0 8px var(--ok)}
+.project-title .status-dot.run{background:var(--cyan);box-shadow:0 0 8px var(--cyan);animation:blink 1.5s infinite}
+.project-title .status-dot.wait{background:var(--warn);box-shadow:0 0 8px var(--warn)}
+.project-title .status-dot.sched{background:var(--violet);box-shadow:0 0 8px var(--violet)}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:0.4}}
+.project-meta{font-size:11.5px;color:var(--t3);display:flex;gap:8px;flex-wrap:wrap}
+.project-meta .sep{color:var(--t3);opacity:0.5}
+.project-tag{position:absolute;top:10px;left:10px;padding:3px 9px;border-radius:6px;font-size:10.5px;font-weight:500;background:rgba(8,9,13,0.7);backdrop-filter:blur(6px);border:1px solid rgba(255,255,255,0.12);color:#fff}
+
+/* ============ STUDIO ============ */
+.studio{display:grid;grid-template-columns:230px 1fr 300px;gap:16px;height:calc(100vh - 56px - 64px);min-height:600px}
+.scenes-rail{background:var(--bg1);border:1px solid var(--line);border-radius:var(--r-lg);display:flex;flex-direction:column;overflow:hidden}
+.rail-head{padding:14px 16px;display:flex;align-items:center;gap:8px;border-bottom:1px solid var(--line);font-size:12.5px;font-weight:500}
+.rail-head .count{font-size:11px;color:var(--t3);font-family:'JetBrains Mono',monospace}
+.rail-head .right{margin-left:auto}
+.scenes-list{flex:1;overflow:auto;padding:8px}
+.scene-item{display:grid;grid-template-columns:38px 1fr auto;gap:10px;align-items:center;padding:8px;border-radius:9px;cursor:pointer;transition:all 0.12s;position:relative}
+.scene-item:hover{background:var(--bg2)}
+.scene-item.on{background:linear-gradient(90deg,rgba(139,124,246,0.14),rgba(139,124,246,0.03));box-shadow:inset 2px 0 0 var(--violet)}
+.scene-num{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--t3);text-align:center}
+.scene-item.on .scene-num{color:var(--violet-2)}
+.scene-thumb{width:38px;height:24px;border-radius:5px;overflow:hidden;position:relative;flex-shrink:0}
+.scene-thumb .art{position:absolute;inset:0}
+.scene-info{min-width:0;font-size:12px}
+.scene-info .name{font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.scene-info .dur{font-size:10.5px;color:var(--t3);font-family:'JetBrains Mono',monospace}
+.scene-status{width:6px;height:6px;border-radius:50%;flex-shrink:0}
+.scene-status.ok{background:var(--ok)}
+.scene-status.run{background:var(--cyan);animation:blink 1.5s infinite}
+.scene-status.wait{background:var(--t3)}
+
+.preview-col{display:flex;flex-direction:column;gap:16px;min-width:0}
+.preview-stage{flex:1;position:relative;background:radial-gradient(ellipse at 50% 30%,rgba(139,124,246,0.10),transparent 60%),radial-gradient(ellipse at 50% 90%,rgba(34,211,238,0.06),transparent 60%),var(--bg1);border:1px solid var(--line);border-radius:var(--r-lg);display:flex;align-items:center;justify-content:center;overflow:hidden;min-height:340px}
+.stage-grid{position:absolute;inset:0;background-image:linear-gradient(rgba(255,255,255,0.02) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,0.02) 1px,transparent 1px);background-size:24px 24px;mask-image:radial-gradient(ellipse at center,black 30%,transparent 75%);pointer-events:none}
+.phone{position:relative;aspect-ratio:9/16;height:min(90%,560px);border-radius:22px;border:1px solid var(--line-3);overflow:hidden;box-shadow:0 40px 80px -20px rgba(0,0,0,0.7),0 0 0 6px rgba(255,255,255,0.02),0 0 60px -10px rgba(139,124,246,0.35)}
+.phone-screen{position:absolute;inset:0;overflow:hidden}
+.phone-screen .sky{position:absolute;inset:0;background:radial-gradient(circle at 30% 25%,rgba(251,191,36,0.55),transparent 30%),radial-gradient(circle at 70% 60%,rgba(52,211,153,0.28),transparent 40%),linear-gradient(180deg,#1e3a2f 0%,#0f1e1a 45%,#080f12 100%)}
+.phone-screen .sun{position:absolute;top:18%;left:26%;width:56px;height:56px;border-radius:50%;background:radial-gradient(circle,rgba(255,224,138,0.9),rgba(251,191,36,0.3) 50%,transparent 70%);filter:blur(2px)}
+.phone-screen .layer-back{position:absolute;bottom:0;left:0;right:0;height:55%;background:linear-gradient(180deg,transparent,rgba(6,12,16,0.85) 60%,rgba(4,8,10,0.98))}
+.phone-screen .tree{position:absolute;bottom:0;width:0;height:0;border-left:22px solid transparent;border-right:22px solid transparent;border-bottom:70px solid rgba(4,10,8,0.85)}
+.phone-screen .tree.t1{left:-10px;border-bottom-width:110px;border-left-width:36px;border-right-width:36px}
+.phone-screen .tree.t2{left:32%;border-bottom-width:80px;opacity:0.7}
+.phone-screen .tree.t3{right:-8px;border-bottom-width:130px;border-left-width:44px;border-right-width:44px;opacity:0.9}
+.phone-screen .tree.t4{right:24%;border-bottom-width:60px;opacity:0.55}
+.phone-screen .ground{position:absolute;bottom:0;left:0;right:0;height:14%;background:linear-gradient(180deg,rgba(15,34,26,0.9),rgba(4,10,8,1))}
+.phone-screen .cat{position:absolute;bottom:15%;left:38%;width:38px;height:34px;opacity:0.92;filter:drop-shadow(0 4px 12px rgba(0,0,0,0.6))}
+.phone-screen .bird{position:absolute;bottom:22%;right:34%;width:22px;height:20px;opacity:0.92;filter:drop-shadow(0 4px 12px rgba(0,0,0,0.6))}
+.phone-subs{position:absolute;bottom:22px;left:16px;right:16px;text-align:center}
+.sub-pill{display:inline-block;padding:7px 14px;border-radius:8px;background:rgba(0,0,0,0.72);backdrop-filter:blur(8px);border:1px solid rgba(255,255,255,0.10);font-size:13px;color:#fff;font-weight:500;line-height:1.4;max-width:100%}
+.phone-progress{position:absolute;bottom:0;left:0;right:0;height:3px;background:rgba(255,255,255,0.08)}
+.phone-progress i{display:block;height:100%;width:40%;background:var(--grad-brand);box-shadow:0 0 12px var(--violet)}
+
+.timeline{background:var(--bg1);border:1px solid var(--line);border-radius:var(--r-lg);padding:14px 0;overflow:hidden}
+.tl-head{padding:0 16px 10px;display:flex;align-items:center;gap:10px;border-bottom:1px solid var(--line);margin-bottom:10px;font-size:12.5px}
+.tl-head .right{margin-left:auto;display:flex;gap:6px}
+.tl-head .time{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--t2);padding:3px 8px;border-radius:5px;background:var(--bg2)}
+.tl-body{position:relative}
+.tl-row{display:grid;grid-template-columns:64px 1fr;align-items:center;height:32px;padding-right:16px}
+.tl-label{padding-left:16px;font-size:11px;color:var(--t3);letter-spacing:0.04em;text-transform:uppercase;font-weight:600}
+.tl-track{position:relative;height:20px;background:rgba(255,255,255,0.015);border-radius:5px;border:1px solid var(--line)}
+.tl-clip{position:absolute;top:1px;bottom:1px;border-radius:4px;display:flex;align-items:center;padding:0 8px;font-size:10px;font-weight:500;overflow:hidden;white-space:nowrap;cursor:pointer;transition:filter 0.15s}
+.tl-clip:hover{filter:brightness(1.15)}
+.tl-clip.v{background:linear-gradient(90deg,rgba(139,124,246,0.55),rgba(139,124,246,0.35));color:#e9e4ff;border:1px solid rgba(139,124,246,0.7)}
+.tl-clip.a{background:linear-gradient(90deg,rgba(34,211,238,0.45),rgba(34,211,238,0.28));color:#d3f6fd;border:1px solid rgba(34,211,238,0.6)}
+.tl-clip.m{background:linear-gradient(90deg,rgba(244,114,182,0.42),rgba(244,114,182,0.25));color:#fbe2f0;border:1px solid rgba(244,114,182,0.6)}
+.tl-clip.s{background:linear-gradient(90deg,rgba(251,191,36,0.42),rgba(251,191,36,0.25));color:#fef3c7;border:1px solid rgba(251,191,36,0.6)}
+.tl-playhead{position:absolute;top:0;bottom:0;left:40%;width:1px;background:var(--violet);box-shadow:0 0 8px var(--violet);pointer-events:none}
+.tl-playhead::before{content:"";position:absolute;top:-4px;left:-4px;width:9px;height:9px;border-radius:50%;background:var(--violet);box-shadow:0 0 12px var(--violet)}
+
+.props{background:var(--bg1);border:1px solid var(--line);border-radius:var(--r-lg);overflow:auto}
+.prop-head{padding:14px 18px;border-bottom:1px solid var(--line);position:sticky;top:0;background:var(--bg1);z-index:2}
+.prop-head .k{font-size:11px;letter-spacing:0.08em;text-transform:uppercase;color:var(--t3);font-weight:600}
+.prop-head .v{font-size:14px;font-weight:600;margin-top:2px}
+.prop-section{padding:16px 18px;border-bottom:1px solid var(--line)}
+.prop-section:last-child{border-bottom:none}
+.prop-label{font-size:11.5px;font-weight:500;color:var(--t2);margin-bottom:8px;display:flex;align-items:center;gap:6px}
+.prop-label .hint{font-size:10.5px;color:var(--t3);font-weight:400;margin-left:auto}
+.prop-textarea{width:100%;background:var(--bg0);border:1px solid var(--line-2);border-radius:8px;padding:10px 12px;font-size:12.5px;line-height:1.55;color:var(--t1);resize:vertical;min-height:88px;font-family:'JetBrains Mono',monospace}
+.prop-textarea:focus{outline:none;border-color:var(--violet);box-shadow:0 0 0 3px rgba(139,124,246,0.14)}
+.seg{display:grid;grid-template-columns:repeat(3,1fr);gap:4px;padding:3px;background:var(--bg0);border:1px solid var(--line-2);border-radius:8px;font-size:11.5px}
+.seg button{padding:6px 8px;border-radius:5px;color:var(--t2);transition:all 0.12s;font-weight:500}
+.seg button:hover{color:var(--t1)}
+.seg button.on{background:var(--bg3);color:var(--t1);box-shadow:0 1px 3px rgba(0,0,0,0.4)}
+.prop-chips{display:flex;flex-wrap:wrap;gap:6px}
+.prop-chips .chip{cursor:pointer}
+.prop-chips .chip:hover{background:var(--bg3);color:var(--t1)}
+.prop-chips .chip.on{background:rgba(139,124,246,0.14);color:#c4b5fd;border-color:rgba(139,124,246,0.4)}
+.slider-row{display:flex;align-items:center;gap:10px}
+.slider-row input[type=range]{flex:1;appearance:none;height:4px;background:var(--bg3);border-radius:2px;outline:none}
+.slider-row input[type=range]::-webkit-slider-thumb{appearance:none;width:14px;height:14px;border-radius:50%;background:var(--violet);box-shadow:0 0 0 3px rgba(139,124,246,0.2),0 0 12px rgba(139,124,246,0.6);cursor:pointer}
+.slider-row .v{font-family:'JetBrains Mono',monospace;font-size:11.5px;color:var(--t1);min-width:44px;text-align:right}
+
+/* ============ AUTOPILOT ============ */
+.ap-grid{display:grid;grid-template-columns:380px 1fr;gap:20px;align-items:start}
+.ap-config{background:var(--bg1);border:1px solid var(--line);border-radius:var(--r-lg);overflow:hidden}
+.ap-config-head{padding:16px 18px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:10px;background:linear-gradient(180deg,rgba(52,211,153,0.06),transparent)}
+.ap-pulse{width:8px;height:8px;border-radius:50%;background:var(--ok);box-shadow:0 0 0 4px rgba(52,211,153,0.2),0 0 12px var(--ok);animation:blink 1.5s infinite}
+.ap-title{font-size:13.5px;font-weight:600}
+.ap-sub{font-size:11.5px;color:var(--t3);margin-top:1px}
+.ap-toggle{margin-left:auto}
+.toggle{width:40px;height:22px;border-radius:999px;background:var(--bg3);position:relative;cursor:pointer;transition:background 0.15s;flex-shrink:0;border:1px solid var(--line-2)}
+.toggle::after{content:"";position:absolute;top:2px;left:2px;width:16px;height:16px;border-radius:50%;background:var(--t2);transition:all 0.15s}
+.toggle.on{background:rgba(52,211,153,0.35);border-color:rgba(52,211,153,0.5)}
+.toggle.on::after{left:20px;background:var(--ok);box-shadow:0 0 10px rgba(52,211,153,0.7)}
+.ap-body{padding:18px}
+.ap-field{margin-bottom:16px}
+.ap-field:last-child{margin-bottom:0}
+.ap-label{display:flex;align-items:center;gap:6px;font-size:12px;font-weight:500;color:var(--t2);margin-bottom:7px}
+.ap-label .hint{margin-left:auto;font-size:10.5px;color:var(--t3);font-weight:400}
+.ap-input,.ap-select{width:100%;background:var(--bg0);border:1px solid var(--line-2);border-radius:9px;padding:10px 12px;font-size:13px;color:var(--t1);transition:all 0.12s}
+.ap-input:focus,.ap-select:focus{outline:none;border-color:var(--violet);box-shadow:0 0 0 3px rgba(139,124,246,0.16)}
+.ap-chip-row{display:flex;flex-wrap:wrap;gap:6px}
+.ap-chip-row .chip{cursor:pointer;transition:all 0.12s}
+.ap-chip-row .chip:hover{background:var(--bg3);color:var(--t1)}
+.ap-chip-row .chip.on{background:rgba(139,124,246,0.14);color:#c4b5fd;border-color:rgba(139,124,246,0.4)}
+.ap-num-row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.ap-num{display:flex;align-items:center;gap:6px;background:var(--bg0);border:1px solid var(--line-2);border-radius:9px;padding:8px 12px}
+.ap-num input{background:transparent;border:none;outline:none;font-size:14px;font-weight:600;width:100%;color:var(--t1);font-family:'JetBrains Mono',monospace}
+.ap-num .unit{font-size:11px;color:var(--t3);font-family:'JetBrains Mono',monospace}
+
+/* Safety panel */
+.safety-panel{background:rgba(251,191,36,0.05);border:1px solid rgba(251,191,36,0.22);border-radius:12px;padding:14px 16px;margin-top:16px}
+.safety-title{display:flex;align-items:center;gap:8px;font-size:12.5px;font-weight:600;color:#fcd34d;margin-bottom:10px}
+.safety-title .ico{width:20px;height:20px;border-radius:6px;background:rgba(251,191,36,0.18);display:grid;place-items:center;font-size:11px}
+.safety-row{display:flex;align-items:center;gap:10px;padding:8px 0;font-size:12px;color:var(--t2)}
+.safety-row + .safety-row{border-top:1px dashed rgba(251,191,36,0.15)}
+.safety-row .val{margin-left:auto;font-family:'JetBrains Mono',monospace;font-size:11.5px;color:var(--t1)}
+
+/* Weekly schedule */
+.ap-week{display:grid;grid-template-columns:repeat(7,1fr);gap:8px;margin-bottom:20px}
+.week-day{background:var(--bg1);border:1px solid var(--line);border-radius:12px;padding:12px 10px;min-height:150px;display:flex;flex-direction:column;gap:6px}
+.week-day.today{border-color:rgba(139,124,246,0.45);box-shadow:0 0 0 1px rgba(139,124,246,0.2),0 0 20px -8px rgba(139,124,246,0.6)}
+.week-day .day-head{display:flex;align-items:baseline;gap:4px;padding-bottom:6px;border-bottom:1px solid var(--line);margin-bottom:4px}
+.week-day .dow{font-size:11px;font-weight:600;color:var(--t2);text-transform:uppercase;letter-spacing:0.06em}
+.week-day .dom{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--t3);margin-left:auto}
+.week-slot{background:linear-gradient(135deg,rgba(52,211,153,0.14),rgba(34,211,238,0.08));border:1px solid rgba(52,211,153,0.28);border-radius:7px;padding:6px 8px;font-size:10.5px;cursor:pointer;transition:all 0.12s;position:relative}
+.week-slot:hover{transform:translateY(-1px);box-shadow:0 4px 12px -4px rgba(52,211,153,0.4)}
+.week-slot .t{font-family:'JetBrains Mono',monospace;font-size:10px;color:#6ee7b7;font-weight:600;margin-bottom:2px}
+.week-slot .n{color:var(--t1);font-weight:500;line-height:1.3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.week-slot.done{background:rgba(52,211,153,0.06);border-color:rgba(52,211,153,0.2);opacity:0.65}
+.week-slot.done::before{content:"✓ ";color:var(--ok)}
+.week-slot.fail{background:rgba(248,113,113,0.08);border-color:rgba(248,113,113,0.3)}
+.week-slot.fail::before{content:"! ";color:var(--err)}
+
+/* Upcoming jobs list */
+.ap-jobs{display:flex;flex-direction:column;gap:8px}
+.ap-job{display:grid;grid-template-columns:48px 1fr auto auto;gap:14px;align-items:center;padding:12px 14px;background:var(--bg1);border:1px solid var(--line);border-radius:11px;transition:all 0.12s}
+.ap-job:hover{border-color:var(--line-3);background:var(--bg2)}
+.ap-job .time{font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--t2);font-weight:500}
+.ap-job .body{min-width:0}
+.ap-job .title{font-size:13px;font-weight:500;margin-bottom:2px}
+.ap-job .meta{font-size:11px;color:var(--t3)}
+.ap-job .st{padding:3px 9px;border-radius:6px;font-size:10.5px;font-weight:500}
+.ap-job .st.sched{background:rgba(139,124,246,0.14);color:#c4b5fd}
+.ap-job .st.run{background:rgba(34,211,238,0.14);color:#67e8f9}
+.ap-job .st.ok{background:rgba(52,211,153,0.14);color:#6ee7b7}
+
+/* ============ PUBLISH ============ */
+.channels-strip{display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-bottom:24px}
+.channel{background:var(--bg1);border:1px solid var(--line);border-radius:12px;padding:14px;transition:all 0.15s;cursor:pointer;position:relative;overflow:hidden}
+.channel:hover{border-color:var(--line-3);transform:translateY(-2px)}
+.channel .head{display:flex;align-items:center;gap:10px;margin-bottom:10px}
+.channel .logo{width:34px;height:34px;border-radius:9px;display:grid;place-items:center;font-size:14px;font-weight:700;color:#fff;flex-shrink:0;position:relative}
+.channel .logo.tiktok{background:linear-gradient(135deg,#000 0%,#25F4EE 60%,#FE2C55 100%)}
+.channel .logo.youtube{background:linear-gradient(135deg,#FF0000,#c00)}
+.channel .logo.facebook{background:linear-gradient(135deg,#1877F2,#0a5ac9)}
+.channel .logo.instagram{background:linear-gradient(135deg,#833AB4,#E1306C 50%,#FD1D1D 85%,#F56040 100%)}
+.channel .logo.shopee{background:linear-gradient(135deg,#EE4D2D,#c73b20)}
+.channel .name{font-size:12.5px;font-weight:600}
+.channel .followers{font-size:10.5px;color:var(--t3);font-family:'JetBrains Mono',monospace}
+.channel .status{display:inline-flex;align-items:center;gap:5px;font-size:10.5px;padding:2px 7px;border-radius:999px;font-weight:500}
+.channel .status.ok{background:rgba(52,211,153,0.12);color:#6ee7b7}
+.channel .status.warn{background:rgba(251,191,36,0.12);color:#fcd34d}
+.channel .status.err{background:rgba(248,113,113,0.12);color:#fca5a5}
+.channel .foot{display:flex;align-items:center;justify-content:space-between;padding-top:10px;border-top:1px solid var(--line)}
+.channel .last-post{font-size:10.5px;color:var(--t3)}
+.channel.add{border-style:dashed;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;gap:6px;color:var(--t3);min-height:120px}
+.channel.add .plus{width:32px;height:32px;border-radius:50%;background:var(--bg2);border:1px solid var(--line-2);display:grid;place-items:center;font-size:18px;color:var(--t2)}
+.channel.add .t{font-size:11.5px;font-weight:500}
+
+.pub-grid{display:grid;grid-template-columns:1fr 380px;gap:20px;align-items:start}
+.pub-schedule{background:var(--bg1);border:1px solid var(--line);border-radius:var(--r-lg);overflow:hidden}
+.pub-queue{background:var(--bg1);border:1px solid var(--line);border-radius:var(--r-lg);overflow:hidden}
+.pub-tabs{display:flex;gap:2px;padding:12px 16px 0;border-bottom:1px solid var(--line)}
+.pub-tab{padding:9px 14px;border-radius:8px 8px 0 0;font-size:12.5px;font-weight:500;color:var(--t2);cursor:pointer;position:relative;transition:all 0.12s}
+.pub-tab:hover{color:var(--t1)}
+.pub-tab.on{color:var(--t1);background:rgba(139,124,246,0.08)}
+.pub-tab.on::after{content:"";position:absolute;bottom:-1px;left:14px;right:14px;height:2px;background:var(--violet);border-radius:2px 2px 0 0}
+.pub-body{padding:20px}
+
+/* Week calendar for publish */
+.pub-week{display:grid;grid-template-columns:repeat(7,1fr);gap:6px}
+.pub-day{background:var(--bg0);border:1px solid var(--line);border-radius:10px;padding:10px 8px;min-height:180px;display:flex;flex-direction:column;gap:5px}
+.pub-day.today{border-color:rgba(139,124,246,0.4);background:rgba(139,124,246,0.04)}
+.pub-day .dh{display:flex;align-items:baseline;gap:4px;padding-bottom:6px;border-bottom:1px solid var(--line);margin-bottom:6px}
+.pub-day .dh .dow{font-size:10px;font-weight:600;color:var(--t3);text-transform:uppercase;letter-spacing:0.08em}
+.pub-day .dh .dom{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--t2);margin-left:auto;font-weight:500}
+.pub-day.today .dh .dom{color:var(--violet-2)}
+.pub-slot{display:flex;flex-direction:column;gap:4px;padding:6px 7px;border-radius:7px;font-size:10px;cursor:pointer;transition:all 0.12s;background:rgba(139,124,246,0.10);border:1px solid rgba(139,124,246,0.25)}
+.pub-slot:hover{transform:translateX(2px);background:rgba(139,124,246,0.18)}
+.pub-slot .time{font-family:'JetBrains Mono',monospace;font-size:9.5px;color:#c4b5fd;font-weight:600}
+.pub-slot .title{color:var(--t1);font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:10.5px}
+.pub-slot .chans{display:flex;gap:2px}
+.pub-slot .chans span{width:12px;height:12px;border-radius:3px;display:grid;place-items:center;font-size:7px;font-weight:700;color:#fff}
+.pub-slot .chans .tt{background:#000}
+.pub-slot .chans .yt{background:#FF0000}
+.pub-slot .chans .fb{background:#1877F2}
+.pub-slot .chans .ig{background:linear-gradient(135deg,#833AB4,#E1306C)}
+.pub-slot .chans .sp{background:#EE4D2D}
+.pub-slot.done{background:rgba(52,211,153,0.08);border-color:rgba(52,211,153,0.2);opacity:0.75}
+.pub-slot.done .time{color:#6ee7b7}
+
+/* Queue list */
+.queue-list{display:flex;flex-direction:column;gap:8px;max-height:640px;overflow:auto}
+.queue-item{display:grid;grid-template-columns:44px 1fr;gap:12px;padding:12px;border-radius:10px;background:var(--bg0);border:1px solid var(--line);transition:all 0.12s}
+.queue-item:hover{border-color:var(--line-3);background:var(--bg2)}
+.queue-thumb{aspect-ratio:9/16;border-radius:6px;background:linear-gradient(135deg,#2a2350,#16192a);position:relative;overflow:hidden}
+.queue-thumb::after{content:"";position:absolute;inset:0;background:radial-gradient(circle at 30% 30%,rgba(139,124,246,0.4),transparent 55%)}
+.queue-body{min-width:0}
+.queue-title{font-size:12.5px;font-weight:500;margin-bottom:3px;line-height:1.35}
+.queue-chips{display:flex;gap:4px;flex-wrap:wrap;margin-bottom:5px}
+.queue-chips .mini{width:16px;height:16px;border-radius:4px;display:grid;place-items:center;font-size:8px;font-weight:700;color:#fff}
+.queue-chips .mini.tt{background:#000}
+.queue-chips .mini.yt{background:#FF0000}
+.queue-chips .mini.fb{background:#1877F2}
+.queue-chips .mini.ig{background:linear-gradient(135deg,#833AB4,#E1306C)}
+.queue-chips .mini.sp{background:#EE4D2D}
+.queue-meta{font-size:10.5px;color:var(--t3);display:flex;align-items:center;gap:6px;font-family:'JetBrains Mono',monospace}
+.queue-meta .st{padding:1px 6px;border-radius:4px;font-size:9.5px;font-weight:600}
+.queue-meta .st.sched{background:rgba(139,124,246,0.14);color:#c4b5fd}
+.queue-meta .st.run{background:rgba(34,211,238,0.14);color:#67e8f9}
+.queue-meta .st.ok{background:rgba(52,211,153,0.14);color:#6ee7b7}
+.queue-meta .st.err{background:rgba(248,113,113,0.14);color:#fca5a5}
+
+/* History table */
+.hist-table{width:100%;border-collapse:collapse;font-size:12.5px}
+.hist-table th{text-align:left;padding:12px 16px;font-size:10.5px;letter-spacing:0.08em;text-transform:uppercase;color:var(--t3);font-weight:600;border-bottom:1px solid var(--line);background:var(--bg1)}
+.hist-table td{padding:12px 16px;border-bottom:1px solid var(--line);vertical-align:middle}
+.hist-table tr:hover td{background:rgba(255,255,255,0.012)}
+.hist-table tr:last-child td{border-bottom:none}
+
+/* ============ AFFILIATE ============ */
+.affil-layout{display:grid;grid-template-columns:380px 1fr;gap:20px;align-items:start}
+.form-panel{background:var(--bg1);border:1px solid var(--line);border-radius:var(--r-lg);overflow:hidden}
+.form-head{padding:16px 18px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:10px}
+.form-head .step{width:22px;height:22px;border-radius:6px;background:var(--grad-warm);display:grid;place-items:center;font-size:11px;font-weight:700;color:#1a0a0e}
+.form-head .title{font-size:13.5px;font-weight:600}
+.form-head .sub{font-size:11.5px;color:var(--t3);margin-top:1px}
+.form-body{padding:18px}
+.form-group{margin-bottom:16px}
+.form-group:last-child{margin-bottom:0}
+.form-label{display:flex;align-items:center;gap:6px;font-size:12px;font-weight:500;color:var(--t2);margin-bottom:7px}
+.form-label .req{color:var(--err);font-size:13px;line-height:1}
+.form-label .hint{margin-left:auto;font-size:10.5px;color:var(--t3);font-weight:400}
+.form-input,.form-textarea{width:100%;background:var(--bg0);border:1px solid var(--line-2);border-radius:9px;padding:10px 12px;font-size:13px;color:var(--t1);transition:all 0.12s}
+.form-textarea{min-height:78px;resize:vertical;line-height:1.55;font-family:inherit}
+.form-input:focus,.form-textarea:focus{outline:none;border-color:var(--violet);box-shadow:0 0 0 3px rgba(139,124,246,0.16)}
+.uploaded{display:flex;align-items:center;gap:12px;padding:10px;background:var(--bg0);border:1px solid var(--line-2);border-radius:10px}
+.uploaded .thumb{width:48px;height:48px;border-radius:8px;background:linear-gradient(135deg,#fbbf24,#f472b6);display:grid;place-items:center;flex-shrink:0;font-size:22px}
+.uploaded .info{flex:1;min-width:0}
+.uploaded .name{font-size:12.5px;font-weight:500}
+.uploaded .size{font-size:11px;color:var(--t3)}
+.uploaded .remove{width:26px;height:26px;border-radius:6px;display:grid;place-items:center;color:var(--t3);cursor:pointer;transition:all 0.12s}
+.uploaded .remove:hover{background:var(--bg2);color:var(--err)}
+.gen-btn{width:100%;padding:12px 16px;border-radius:11px;background:linear-gradient(135deg,#f472b6 0%,#fbbf24 100%);color:#1a0a0e;font-weight:600;font-size:13.5px;display:flex;align-items:center;justify-content:center;gap:8px;box-shadow:0 8px 24px -8px rgba(244,114,182,0.6);transition:filter 0.12s;margin-top:6px}
+.gen-btn:hover{filter:brightness(1.05)}
+.gen-btn svg{width:15px;height:15px}
+
+.affil-right{display:flex;flex-direction:column;gap:16px}
+.affil-stage{position:relative;background:radial-gradient(ellipse at 50% 30%,rgba(244,114,182,0.10),transparent 60%),var(--bg1);border:1px solid var(--line);border-radius:var(--r-lg);padding:28px;display:flex;gap:28px;min-height:480px}
+.affil-phone{position:relative;aspect-ratio:9/16;height:420px;border-radius:20px;border:1px solid var(--line-3);overflow:hidden;flex-shrink:0;box-shadow:0 30px 60px -20px rgba(0,0,0,0.7),0 0 0 5px rgba(255,255,255,0.02),0 0 50px -10px rgba(244,114,182,0.35)}
+.affil-scene{position:absolute;inset:0;background:radial-gradient(circle at 50% 40%,rgba(251,191,36,0.35),transparent 50%),linear-gradient(160deg,#2a1d3d 0%,#1a1224 50%,#0a0712 100%)}
+.affil-product{position:absolute;top:32%;left:50%;transform:translateX(-50%);width:120px;height:140px;border-radius:16px;background:linear-gradient(160deg,#fef3c7 0%,#fbbf24 45%,#f59e0b 100%);box-shadow:0 20px 40px -10px rgba(0,0,0,0.5),0 0 40px -10px rgba(251,191,36,0.5);display:grid;place-items:center}
+.affil-product::before{content:"";position:absolute;inset:8px;border-radius:11px;background:linear-gradient(160deg,rgba(255,255,255,0.4),transparent 50%);border:1px solid rgba(255,255,255,0.25)}
+.affil-product .icon{font-size:44px;position:relative;z-index:1}
+.affil-badge-corner{position:absolute;top:12px;left:12px;padding:4px 9px;border-radius:6px;background:rgba(0,0,0,0.7);backdrop-filter:blur(8px);border:1px solid rgba(255,255,255,0.15);font-size:10px;font-weight:600;color:#fff}
+.affil-discount{position:absolute;top:20%;right:14px;width:52px;height:52px;border-radius:50%;background:linear-gradient(135deg,#ef4444,#f472b6);display:grid;place-items:center;color:#fff;font-weight:700;font-size:14px;line-height:1;box-shadow:0 8px 24px -4px rgba(239,68,68,0.7);transform:rotate(-12deg);border:2px solid rgba(255,255,255,0.4)}
+.affil-discount small{font-size:9px;font-weight:500;display:block;margin-top:1px}
+.affil-headline{position:absolute;top:10%;left:0;right:0;text-align:center;padding:0 16px}
+.affil-headline .line1{font-size:11px;font-weight:600;color:#fbbf24;letter-spacing:0.15em;text-transform:uppercase;margin-bottom:2px}
+.affil-headline .line2{font-size:18px;font-weight:700;color:#fff;line-height:1.2;text-shadow:0 2px 8px rgba(0,0,0,0.6)}
+.affil-price{position:absolute;bottom:34%;left:50%;transform:translateX(-50%);display:flex;align-items:baseline;gap:8px}
+.affil-price .old{font-size:12px;color:rgba(255,255,255,0.55);text-decoration:line-through}
+.affil-price .new{font-size:22px;font-weight:800;color:#fff;text-shadow:0 2px 12px rgba(0,0,0,0.6)}
+.affil-price .new small{font-size:12px;font-weight:600;margin-right:2px}
+.affil-cta{position:absolute;bottom:14%;left:16px;right:16px;padding:11px;border-radius:10px;background:linear-gradient(135deg,#f472b6,#fbbf24);text-align:center;font-size:13px;font-weight:700;color:#1a0a0e;box-shadow:0 8px 20px -4px rgba(244,114,182,0.6);animation:pulseCTA 2.4s ease-in-out infinite}
+@keyframes pulseCTA{0%,100%{transform:scale(1)}50%{transform:scale(1.03)}}
+.affil-sub{position:absolute;bottom:6%;left:16px;right:16px;text-align:center}
+.affil-sub .pill{display:inline-block;padding:5px 12px;border-radius:7px;background:rgba(0,0,0,0.75);backdrop-filter:blur(8px);border:1px solid rgba(255,255,255,0.1);font-size:11.5px;color:#fff;line-height:1.4}
+.affil-ftc{position:absolute;bottom:8px;left:0;right:0;text-align:center;font-size:9px;color:rgba(255,255,255,0.5)}
+.affil-side{flex:1;min-width:0;display:flex;flex-direction:column;gap:14px}
+.info-block{background:var(--bg2);border:1px solid var(--line);border-radius:12px;padding:14px 16px}
+.info-block .k{font-size:10.5px;letter-spacing:0.08em;text-transform:uppercase;color:var(--t3);font-weight:600;margin-bottom:8px}
+.hook-opt{display:flex;align-items:flex-start;gap:10px;padding:10px 12px;border:1px solid var(--line-2);border-radius:9px;cursor:pointer;transition:all 0.12s;font-size:12.5px;line-height:1.45;margin-bottom:6px}
+.hook-opt:last-child{margin-bottom:0}
+.hook-opt:hover{background:var(--bg3);border-color:var(--line-3)}
+.hook-opt.on{border-color:rgba(244,114,182,0.5);background:rgba(244,114,182,0.06);box-shadow:inset 2px 0 0 var(--pink)}
+.hook-opt .radio{width:14px;height:14px;border-radius:50%;border:1.5px solid var(--line-3);flex-shrink:0;margin-top:2px;position:relative}
+.hook-opt.on .radio{border-color:var(--pink)}
+.hook-opt.on .radio::after{content:"";position:absolute;inset:3px;border-radius:50%;background:var(--pink)}
+.ftc-panel{display:flex;align-items:flex-start;gap:12px;padding:14px 16px;background:rgba(251,191,36,0.06);border:1px solid rgba(251,191,36,0.25);border-radius:12px}
+.ftc-panel .ico{width:32px;height:32px;border-radius:9px;background:rgba(251,191,36,0.15);border:1px solid rgba(251,191,36,0.35);display:grid;place-items:center;font-size:15px;flex-shrink:0}
+.ftc-panel .body{flex:1;min-width:0}
+.ftc-panel .title{font-size:12.5px;font-weight:600;margin-bottom:3px;color:#fcd34d}
+.ftc-panel .desc{font-size:11.5px;color:var(--t2);line-height:1.5}
+
+/* ============ SCENES GRID ============ */
+.scenes-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+.scene-card{background:var(--bg1);border:1px solid var(--line);border-radius:var(--r-lg);overflow:hidden;transition:all 0.2s;cursor:pointer}
+.scene-card:hover{border-color:var(--line-3);transform:translateY(-2px);box-shadow:var(--shadow-lg)}
+.scene-card .frame{aspect-ratio:9/16;position:relative;overflow:hidden;max-height:280px}
+.scene-card .num{position:absolute;top:10px;left:10px;font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:500;padding:3px 8px;border-radius:5px;background:rgba(8,9,13,0.75);backdrop-filter:blur(6px);border:1px solid rgba(255,255,255,0.12);color:#fff}
+.scene-card .dur{position:absolute;bottom:10px;right:10px;font-family:'JetBrains Mono',monospace;font-size:10.5px;padding:3px 7px;border-radius:5px;background:rgba(8,9,13,0.75);backdrop-filter:blur(6px);color:#fff}
+.scene-card-body{padding:12px 14px}
+.scene-card-title{font-size:13px;font-weight:500;margin-bottom:6px}
+.scene-card-meta{font-size:11.5px;color:var(--t3);display:flex;gap:8px;flex-wrap:wrap}
+
+/* ============ PROVIDERS LIST ============ */
+.provider-list{display:flex;flex-direction:column;gap:10px}
+.provider{background:var(--bg1);border:1px solid var(--line);border-radius:var(--r-lg);padding:18px 20px;display:grid;grid-template-columns:44px 1fr auto auto;gap:16px;align-items:center;transition:all 0.15s}
+.provider:hover{border-color:var(--line-3);background:var(--bg2)}
+.prov-logo{width:44px;height:44px;border-radius:11px;display:grid;place-items:center;font-size:14px;font-weight:700;color:#fff;position:relative;overflow:hidden}
+.prov-logo.or{background:linear-gradient(135deg,#6d4aff,#22d3ee)}
+.prov-logo.el{background:linear-gradient(135deg,#111827,#374151)}
+.prov-logo.fa{background:linear-gradient(135deg,#0ea5e9,#06b6d4)}
+.prov-logo.rp{background:linear-gradient(135deg,#ec4899,#f59e0b)}
+.prov-logo.hf{background:linear-gradient(135deg,#fbbf24,#f97316)}
+.prov-info .name{font-size:14px;font-weight:600;margin-bottom:2px;display:flex;align-items:center;gap:8px}
+.prov-info .desc{font-size:12px;color:var(--t3)}
+.prov-models{display:flex;gap:4px;flex-wrap:wrap;justify-content:flex-end;max-width:280px}
+
+/* ============ ACTIVITY TABLE ============ */
+.activity-table{width:100%;border-collapse:collapse;font-size:12.5px}
+.activity-table th{text-align:left;padding:12px 16px;font-size:10.5px;letter-spacing:0.08em;text-transform:uppercase;color:var(--t3);font-weight:600;border-bottom:1px solid var(--line);background:var(--bg1);position:sticky;top:0;z-index:1}
+.activity-table td{padding:14px 16px;border-bottom:1px solid var(--line);vertical-align:middle}
+.activity-table tr:hover td{background:rgba(255,255,255,0.012)}
+.activity-table tr:last-child td{border-bottom:none}
+.activity-table .time{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--t3)}
+.activity-table .task{font-weight:500}
+.activity-table .model{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--t2)}
+.activity-table .lat{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--t3);text-align:right}
+.activity-table .fallback-row{background:rgba(139,124,246,0.04)}
+.activity-table .fallback-row td:first-child{position:relative}
+.activity-table .fallback-row td:first-child::before{content:"↳";position:absolute;left:6px;color:var(--violet);font-size:14px}
+
+/* helper */
+.row{display:flex;align-items:center;gap:10px}
+.row.between{justify-content:space-between}
+.mt-16{margin-top:16px}.mt-24{margin-top:24px}.mb-16{margin-bottom:16px}.mb-24{margin-bottom:24px}
+.grid-2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.t2{color:var(--t2)}.t3{color:var(--t3)}
+
+@media (max-width:1280px){
+  .studio{grid-template-columns:210px 1fr 270px}
+  .projects-grid{grid-template-columns:repeat(2,1fr)}
+  .channels-strip{grid-template-columns:repeat(3,1fr)}
+  .ap-grid,.affil-layout,.pub-grid{grid-template-columns:1fr}
+}
+</style>
+</head>
+<body>
+
+<div class="app">
+
+  <!-- ============ SIDEBAR ============ -->
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="brand-mark"></div>
+      <div>
+        <div class="brand-name">Studio</div>
+        <div class="brand-tag">AI Video Workbench</div>
+      </div>
+    </div>
+
+    <button class="new-btn">
+      <span class="plus">+</span>
+      <span>Tạo video mới</span>
+      <kbd>⌘N</kbd>
+    </button>
+
+    <div class="nav-section">Sáng tạo</div>
+    <div class="nav">
+      <div class="nav-item on" data-nav="home">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5L12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/></svg>
+        Trang chủ
+      </div>
+      <div class="nav-item" data-nav="studio">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M10 4v16M2 12h20"/></svg>
+        Studio
+        <span class="badge live">3</span>
+      </div>
+      <div class="nav-item" data-nav="affiliate">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 7 12 3 4 7v10l8 4 8-4V7Z"/><path d="m4 7 8 4 8-4M12 11v10"/></svg>
+        Affiliate
+        <span class="badge new">New</span>
+      </div>
+    </div>
+
+    <div class="nav-section">Tự động</div>
+    <div class="nav">
+      <div class="nav-item" data-nav="autopilot">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.2 2.2M16.9 16.9l2.2 2.2M4.9 19.1l2.2-2.2M16.9 7.1l2.2-2.2"/><circle cx="12" cy="12" r="4"/></svg>
+        Auto Pilot
+        <span class="badge live">ON</span>
+      </div>
+      <div class="nav-item" data-nav="publish">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7"/></svg>
+        Đăng tải
+        <span class="badge">5</span>
+      </div>
+    </div>
+
+    <div class="nav-section">Hệ thống</div>
+    <div class="nav">
+      <div class="nav-item" data-nav="models">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="6" width="12" height="12" rx="2"/><path d="M9 1v4M15 1v4M9 19v4M15 19v4M1 9h4M1 15h4M19 9h4M19 15h4"/></svg>
+        Mô hình AI
+      </div>
+      <div class="nav-item" data-nav="activity">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+        Hoạt động
+      </div>
+    </div>
+
+    <div class="sidebar-foot">
+      <div class="user">
+        <div class="user-av">N</div>
+        <div class="user-info">
+          <div class="user-name">Nguyễn An</div>
+          <div class="user-plan">Gói Studio · 3 dự án</div>
+        </div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- ============ MAIN ============ -->
+  <main class="main">
+
+    <div class="topbar">
+      <div class="crumb">
+        <b id="crumb-project">Studio</b>
+        <span class="sep">/</span>
+        <span id="crumb-page">Trang chủ</span>
+      </div>
+      <div class="topbar-right">
+        <div class="search">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+          <span>Tìm dự án, cảnh, nhân vật…</span>
+          <kbd>⌘K</kbd>
+        </div>
+        <div class="icon-btn">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+          <span class="dot"></span>
+        </div>
+        <div class="icon-btn">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============ HOME ============ -->
+    <section class="view on" data-view="home">
+      <div class="home-hero">
+        <div class="greet">Thứ Ba, 8 tháng 10 · <b>19:04</b></div>
+        <h1 class="hero-title">Hôm nay bạn muốn kể <em>câu chuyện</em> gì?</h1>
+        <div class="prompt-wrap">
+          <div class="prompt">
+            <textarea placeholder="Một chú mèo tên Milo sống trong khu rừng già, tình cờ gặp một chú chim non bị thương…"></textarea>
+            <div class="prompt-foot">
+              <div class="chips">
+                <span class="chip">🎬 Truyện thiếu nhi</span>
+                <span class="chip">🛍️ Review sản phẩm</span>
+                <span class="chip">💡 Kiến thức 60s</span>
+                <span class="chip">🌿 Thiền</span>
+              </div>
+              <button class="btn">30s</button>
+              <button class="btn primary">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 3l14 9-14 9V3z"/></svg>
+                Lên kế hoạch
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="stats">
+        <div class="stat"><div class="accent-bar"></div><div class="k">Video đã tạo</div><div class="v">48</div><div class="hint up">+6 tuần này</div></div>
+        <div class="stat"><div class="accent-bar"></div><div class="k">Đang chạy tự động</div><div class="v">3<small>job</small></div><div class="hint">Auto Pilot bật</div></div>
+        <div class="stat"><div class="accent-bar"></div><div class="k">Chờ đăng</div><div class="v">5</div><div class="hint">Khung giờ vàng tối nay</div></div>
+        <div class="stat"><div class="accent-bar"></div><div class="k">Chi phí tháng</div><div class="v">₫142k</div><div class="hint">Trong hạn mức</div></div>
+      </div>
+
+      <div class="sec-title">
+        <h2>Dự án gần đây</h2>
+        <span class="sub">3 trong số 12 dự án</span>
+        <span class="right">Xem tất cả →</span>
+      </div>
+
+      <div class="projects-grid">
+        <div class="project-card" data-goto="studio">
+          <div class="project-thumb">
+            <div class="art" style="background:radial-gradient(circle at 30% 25%,rgba(251,191,36,0.55),transparent 30%),radial-gradient(circle at 70% 65%,rgba(52,211,153,0.28),transparent 45%),linear-gradient(180deg,#1e3a2f 0%,#0f1e1a 45%,#080f12 100%)"></div>
+            <span class="project-tag">Truyện thiếu nhi</span>
+            <div class="play-overlay"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M5 3l14 9-14 9V3z"/></svg></div>
+            <span class="project-dur">00:34</span>
+          </div>
+          <div class="project-body">
+            <div class="project-title"><span class="status-dot ok"></span>Milo cứu chú chim</div>
+            <div class="project-meta"><span>6 cảnh</span><span class="sep">·</span><span>Đã đăng TikTok</span></div>
+          </div>
+        </div>
+
+        <div class="project-card">
+          <div class="project-thumb">
+            <div class="art" style="background:radial-gradient(circle at 40% 70%,rgba(139,124,246,0.5),transparent 40%),radial-gradient(circle at 70% 30%,rgba(244,114,182,0.3),transparent 45%),linear-gradient(180deg,#2a1d3d 0%,#1a1224 55%,#0a0712 100%)"></div>
+            <span class="project-tag">Kinh dị nhẹ</span>
+            <span class="project-dur">00:28</span>
+          </div>
+          <div class="project-body">
+            <div class="project-title"><span class="status-dot run"></span>Bí ẩn trong rừng</div>
+            <div class="project-meta"><span>5 cảnh</span><span class="sep">·</span><span>Đang tạo cảnh 4/5</span></div>
+          </div>
+        </div>
+
+        <div class="project-card">
+          <div class="project-thumb">
+            <div class="art" style="background:radial-gradient(circle at 50% 40%,rgba(96,165,250,0.45),transparent 45%),linear-gradient(135deg,#0a2530 0%,#152028 50%,#0a0e13 100%)"></div>
+            <span class="project-tag">Tự động</span>
+            <span class="project-dur">00:25</span>
+          </div>
+          <div class="project-body">
+            <div class="project-title"><span class="status-dot sched"></span>Kiến thức 60s · #12</div>
+            <div class="project-meta"><span>4 cảnh</span><span class="sep">·</span><span>Auto Pilot · 21:00 hôm nay</span></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ STUDIO ============ -->
+    <section class="view" data-view="studio">
+      <div class="studio">
+        <div class="scenes-rail">
+          <div class="rail-head">Cảnh <span class="count">· 6</span>
+            <span class="right"><button class="btn ghost sm"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg></button></span>
+          </div>
+          <div class="scenes-list">
+            <div class="scene-item"><span class="scene-num">01</span><div class="scene-thumb"><div class="art" style="background:linear-gradient(135deg,#1e3a2f,#0f1e1a)"></div></div><div class="scene-info"><div class="name">Milo trong rừng</div><div class="dur">6.0s</div></div><span class="scene-status ok"></span></div>
+            <div class="scene-item"><span class="scene-num">02</span><div class="scene-thumb"><div class="art" style="background:linear-gradient(135deg,#2a3a2f,#152020)"></div></div><div class="scene-info"><div class="name">Tiếng kêu cứu</div><div class="dur">5.2s</div></div><span class="scene-status ok"></span></div>
+            <div class="scene-item on"><span class="scene-num">03</span><div class="scene-thumb"><div class="art" style="background:linear-gradient(135deg,#1f3a30,#0f1e1a)"></div></div><div class="scene-info"><div class="name">Gặp chim non</div><div class="dur">4.8s</div></div><span class="scene-status ok"></span></div>
+            <div class="scene-item"><span class="scene-num">04</span><div class="scene-thumb"><div class="art" style="background:linear-gradient(135deg,#3a2a20,#1f1510)"></div></div><div class="scene-info"><div class="name">Quyết định</div><div class="dur">6.4s</div></div><span class="scene-status run"></span></div>
+            <div class="scene-item"><span class="scene-num">05</span><div class="scene-thumb"><div class="art" style="background:linear-gradient(135deg,#1a2a3a,#101820)"></div></div><div class="scene-info"><div class="name">Vượt suối</div><div class="dur">6.2s</div></div><span class="scene-status wait"></span></div>
+            <div class="scene-item"><span class="scene-num">06</span><div class="scene-thumb"><div class="art" style="background:linear-gradient(135deg,#3a2a10,#201508)"></div></div><div class="scene-info"><div class="name">Đoàn tụ</div><div class="dur">5.4s</div></div><span class="scene-status wait"></span></div>
+          </div>
+        </div>
+
+        <div class="preview-col">
+          <div class="preview-stage">
+            <div class="stage-grid"></div>
+            <div class="phone"><div class="phone-screen">
+              <div class="sky"></div><div class="sun"></div><div class="layer-back"></div>
+              <div class="tree t1"></div><div class="tree t2"></div><div class="tree t3"></div><div class="tree t4"></div>
+              <div class="ground"></div>
+              <svg class="cat" viewBox="0 0 60 55" fill="none"><path d="M18 14 L14 3 L22 9 Z" fill="#0a0f14"/><path d="M42 14 L46 3 L38 9 Z" fill="#0a0f14"/><ellipse cx="30" cy="28" rx="20" ry="16" fill="#0a0f14"/><circle cx="24" cy="24" r="1.6" fill="#d1d5db"/><circle cx="36" cy="24" r="1.6" fill="#d1d5db"/><path d="M30 30 L28 33 L32 33 Z" fill="#d1d5db"/><path d="M8 34 Q3 40 6 44" stroke="#0a0f14" stroke-width="3" stroke-linecap="round" fill="none"/><ellipse cx="42" cy="46" rx="6" ry="4" fill="#0a0f14"/><ellipse cx="24" cy="46" rx="6" ry="4" fill="#0a0f14"/></svg>
+              <svg class="bird" viewBox="0 0 30 26" fill="none"><ellipse cx="15" cy="14" rx="9" ry="7" fill="#0a0f14"/><circle cx="20" cy="10" r="1.2" fill="#d1d5db"/><path d="M9 12 L3 10 L9 15 Z" fill="#0a0f14"/><path d="M19 6 Q22 2 26 4" stroke="#0a0f14" stroke-width="1.5" stroke-linecap="round" fill="none"/></svg>
+              <div class="phone-subs"><span class="sub-pill">"Bạn đừng sợ, mình sẽ giúp bạn tìm bầy."</span></div>
+              <div class="phone-progress"><i></i></div>
+            </div></div>
+          </div>
+
+          <div class="timeline">
+            <div class="tl-head">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px;color:var(--t2)"><rect x="2" y="6" width="20" height="12" rx="2"/><path d="M10 6v12M2 12h20"/></svg>
+              <span>Timeline</span>
+              <span class="time">00:00:14.2 / 00:00:34.0</span>
+              <div class="right">
+                <button class="btn sm"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M5 3l14 9-14 9V3z"/></svg>Phát</button>
+              </div>
+            </div>
+            <div class="tl-body">
+              <div class="tl-row"><div class="tl-label">Video</div><div class="tl-track">
+                <div class="tl-clip v" style="left:0%;width:17.6%">01</div>
+                <div class="tl-clip v" style="left:17.6%;width:15.3%">02</div>
+                <div class="tl-clip v" style="left:32.9%;width:14.1%;box-shadow:0 0 0 1px var(--violet)">03</div>
+                <div class="tl-clip v" style="left:47%;width:18.8%">04</div>
+                <div class="tl-clip v" style="left:65.8%;width:18.2%">05</div>
+                <div class="tl-clip v" style="left:84%;width:16%">06</div>
+              </div></div>
+              <div class="tl-row"><div class="tl-label">Thoại</div><div class="tl-track">
+                <div class="tl-clip a" style="left:8%;width:14%">"Trong rừng già…"</div>
+                <div class="tl-clip a" style="left:34%;width:18%">"Bạn đừng sợ…"</div>
+                <div class="tl-clip a" style="left:62%;width:16%">"Mình sẽ giúp…"</div>
+              </div></div>
+              <div class="tl-row"><div class="tl-label">Nhạc</div><div class="tl-track"><div class="tl-clip m" style="left:0%;width:100%">Nhạc nền · ấm · 70 BPM</div></div></div>
+              <div class="tl-row"><div class="tl-label">Hiệu ứng</div><div class="tl-track">
+                <div class="tl-clip s" style="left:22%;width:8%">Gió</div>
+                <div class="tl-clip s" style="left:56%;width:9%">Suối</div>
+                <div class="tl-clip s" style="left:85%;width:6%">Chim</div>
+              </div></div>
+              <div class="tl-playhead"></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="props">
+          <div class="prop-head">
+            <div class="k">Đang chỉnh sửa</div>
+            <div class="v">Cảnh 03 · Gặp chim non</div>
+          </div>
+          <div class="prop-section">
+            <div class="prop-label">Mô tả hình ảnh <span class="hint">AI</span></div>
+            <textarea class="prop-textarea">3D cartoon, close-up, chú mèo Milo đang cúi xuống bên cạnh chú chim non bị thương trên nền rêu, ánh sáng xuyên qua tán cây, tông ấm, kiểu Pixar</textarea>
+            <div class="row mt-16" style="gap:6px">
+              <button class="btn ghost sm" style="flex:1;justify-content:center">Làm lại</button>
+              <button class="btn primary sm" style="flex:1;justify-content:center">Áp dụng</button>
+            </div>
+          </div>
+          <div class="prop-section">
+            <div class="prop-label">Góc máy</div>
+            <div class="seg"><button>Toàn</button><button>Trung</button><button class="on">Cận</button></div>
+          </div>
+          <div class="prop-section">
+            <div class="prop-label">Chuyển động</div>
+            <div class="prop-chips"><span class="chip">Đứng yên</span><span class="chip on">Đẩy chậm</span><span class="chip">Theo dõi</span></div>
+          </div>
+          <div class="prop-section">
+            <div class="prop-label">Nhân vật</div>
+            <div class="prop-chips"><span class="chip violet"><span class="d"></span>Milo</span><span class="chip violet"><span class="d"></span>Chim non</span></div>
+          </div>
+          <div class="prop-section">
+            <div class="prop-label">Giọng đọc <span class="hint">Tiếng Việt</span></div>
+            <div class="chip" style="width:100%;justify-content:space-between;padding:8px 12px;border-radius:8px"><span>Nam · Ấm · Truyền cảm</span><span style="opacity:0.6">▾</span></div>
+          </div>
+          <div class="prop-section">
+            <div class="prop-label">Thời lượng</div>
+            <div class="slider-row"><input type="range" min="2" max="12" step="0.2" value="4.8"><span class="v">4.8s</span></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ AUTO PILOT ============ -->
+    <section class="view" data-view="autopilot">
+      <div class="page-head">
+        <div>
+          <h1>Auto Pilot</h1>
+          <p>Tự động sản xuất video theo lịch · có giới hạn an toàn và duyệt tự động</p>
+        </div>
+        <div class="actions">
+          <button class="btn">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11H3v10h6V11zM21 3h-6v18h6V3zM15 7H9v14h6V7z"/></svg>
+            Lịch sử chạy
+          </button>
+          <button class="btn primary">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
+            Thêm lịch mới
+          </button>
+        </div>
+      </div>
+
+      <div class="ap-grid">
+        <!-- LEFT: config -->
+        <div class="ap-config">
+          <div class="ap-config-head">
+            <div class="ap-pulse"></div>
+            <div>
+              <div class="ap-title">Cấu hình Auto Pilot</div>
+              <div class="ap-sub">Đang chạy · 3 job hôm nay</div>
+            </div>
+            <div class="ap-toggle"><div class="toggle on" id="apToggle"></div></div>
+          </div>
+          <div class="ap-body">
+            <div class="ap-field">
+              <div class="ap-label">Chủ đề <span class="hint">chọn 1</span></div>
+              <div class="ap-chip-row">
+                <span class="chip on">Truyện thiếu nhi</span>
+                <span class="chip">Kiến thức</span>
+                <span class="chip">Thiền</span>
+                <span class="chip">Kinh dị nhẹ</span>
+              </div>
+            </div>
+            <div class="ap-field">
+              <div class="ap-label">Nhân vật chính</div>
+              <div class="ap-input" style="display:flex;align-items:center;gap:10px;cursor:pointer">
+                <div style="width:24px;height:24px;border-radius:6px;background:linear-gradient(135deg,#fbbf24,#f472b6);display:grid;place-items:center;font-size:12px">🐱</div>
+                <span style="flex:1">Milo — mèo mướp</span>
+                <span style="opacity:0.5;font-size:12px">▾</span>
+              </div>
+            </div>
+            <div class="ap-field">
+              <div class="ap-label">Phong cách</div>
+              <div class="ap-chip-row">
+                <span class="chip on">Hoạt hình 3D</span>
+                <span class="chip">Anime</span>
+                <span class="chip">Tả thực</span>
+                <span class="chip">Flat</span>
+              </div>
+            </div>
+            <div class="ap-field">
+              <div class="ap-label">Thời lượng mỗi video</div>
+              <div class="ap-chip-row">
+                <span class="chip">15s</span>
+                <span class="chip on">30s</span>
+                <span class="chip">45s</span>
+                <span class="chip">60s</span>
+              </div>
+            </div>
+            <div class="ap-field">
+              <div class="ap-label">Số video mỗi ngày</div>
+              <div class="ap-num-row">
+                <div class="ap-num"><input type="text" value="2"><span class="unit">video</span></div>
+                <div class="ap-num"><input type="text" value="30"><span class="unit">ngày chạy</span></div>
+              </div>
+            </div>
+            <div class="ap-field">
+              <div class="ap-label">Khung giờ chạy</div>
+              <div class="ap-num-row">
+                <div class="ap-num"><input type="text" value="09:00"><span class="unit">bắt đầu</span></div>
+                <div class="ap-num"><input type="text" value="21:00"><span class="unit">kết thúc</span></div>
+              </div>
+            </div>
+            <div class="ap-field">
+              <div class="ap-label">Chiến lược model <span class="hint">tự chọn AI</span></div>
+              <div class="ap-chip-row">
+                <span class="chip">Rẻ nhất</span>
+                <span class="chip on">Cân bằng</span>
+                <span class="chip">Nhanh nhất</span>
+                <span class="chip">Chất lượng cao</span>
+              </div>
+            </div>
+            <div class="ap-field">
+              <div class="ap-label">Khi xong video</div>
+              <div class="ap-chip-row">
+                <span class="chip">Chờ tôi duyệt</span>
+                <span class="chip on">Tự duyệt nếu pass QC</span>
+                <span class="chip">Tự đăng ngay</span>
+              </div>
+            </div>
+
+            <div class="safety-panel">
+              <div class="safety-title"><span class="ico">🛡</span>Giới hạn an toàn</div>
+              <div class="safety-row"><span>Chi phí tối đa / ngày</span><span class="val">₫20.000</span></div>
+              <div class="safety-row"><span>Dừng khi 3 lỗi liên tiếp</span><span class="val">BẬT</span></div>
+              <div class="safety-row"><span>Không dùng model trả phí</span><span class="val">BẬT</span></div>
+              <div class="safety-row"><span>Không đăng khi chưa duyệt</span><span class="val">TẮT</span></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- RIGHT: schedule + jobs -->
+        <div style="display:flex;flex-direction:column;gap:20px">
+          <div>
+            <div class="sec-title">
+              <h2>Lịch tuần này</h2>
+              <span class="sub">14 video · 11 đã xong</span>
+              <span class="right">Xem tháng →</span>
+            </div>
+            <div class="ap-week">
+              <div class="week-day">
+                <div class="day-head"><span class="dow">T2</span><span class="dom">07</span></div>
+                <div class="week-slot done"><div class="t">09:00</div><div class="n">Milo #08</div></div>
+                <div class="week-slot done"><div class="t">21:00</div><div class="n">Milo #09</div></div>
+              </div>
+              <div class="week-day today">
+                <div class="day-head"><span class="dow">T3</span><span class="dom">08</span></div>
+                <div class="week-slot done"><div class="t">09:00</div><div class="n">Milo #10</div></div>
+                <div class="week-slot"><div class="t">21:00</div><div class="n">Milo #11</div></div>
+              </div>
+              <div class="week-day">
+                <div class="day-head"><span class="dow">T4</span><span class="dom">09</span></div>
+                <div class="week-slot"><div class="t">09:00</div><div class="n">Chưa sinh</div></div>
+                <div class="week-slot"><div class="t">21:00</div><div class="n">Chưa sinh</div></div>
+              </div>
+              <div class="week-day">
+                <div class="day-head"><span class="dow">T5</span><span class="dom">10</span></div>
+                <div class="week-slot"><div class="t">09:00</div><div class="n">Chưa sinh</div></div>
+                <div class="week-slot"><div class="t">21:00</div><div class="n">Chưa sinh</div></div>
+              </div>
+              <div class="week-day">
+                <div class="day-head"><span class="dow">T6</span><span class="dom">11</span></div>
+                <div class="week-slot"><div class="t">09:00</div><div class="n">Chưa sinh</div></div>
+                <div class="week-slot"><div class="t">21:00</div><div class="n">Chưa sinh</div></div>
+              </div>
+              <div class="week-day">
+                <div class="day-head"><span class="dow">T7</span><span class="dom">12</span></div>
+                <div class="week-slot"><div class="t">09:00</div><div class="n">Chưa sinh</div></div>
+                <div class="week-slot"><div class="t">21:00</div><div class="n">Chưa sinh</div></div>
+              </div>
+              <div class="week-day">
+                <div class="day-head"><span class="dow">CN</span><span class="dom">13</span></div>
+                <div class="week-slot"><div class="t">09:00</div><div class="n">Chưa sinh</div></div>
+                <div class="week-slot"><div class="t">21:00</div><div class="n">Chưa sinh</div></div>
+              </div>
+            </div>
+          </div>
+
+          <div>
+            <div class="sec-title">
+              <h2>Job sắp chạy</h2>
+              <span class="sub">4 job trong 24h tới</span>
+            </div>
+            <div class="ap-jobs">
+              <div class="ap-job">
+                <span class="time">21:00</span>
+                <div class="body">
+                  <div class="title">Milo #11 · Chuyến phiêu lưu mới</div>
+                  <div class="meta">Tự động sinh ý tưởng · 30s · Hoạt hình 3D</div>
+                </div>
+                <span class="chip violet" style="font-size:10px">Balanced</span>
+                <span class="st sched">Chờ</span>
+              </div>
+              <div class="ap-job">
+                <span class="time">09:00</span>
+                <div class="body">
+                  <div class="title">Milo #12 · Ngày mai</div>
+                  <div class="meta">Tự động sinh ý tưởng · 30s · Hoạt hình 3D</div>
+                </div>
+                <span class="chip violet" style="font-size:10px">Balanced</span>
+                <span class="st sched">Mai</span>
+              </div>
+              <div class="ap-job" style="opacity:0.7">
+                <span class="time">21:00</span>
+                <div class="body">
+                  <div class="title">Milo #10 · Đang render cảnh 4/6</div>
+                  <div class="meta">Bắt đầu 20:58 · dự kiến xong 21:04</div>
+                </div>
+                <span class="chip violet" style="font-size:10px">Balanced</span>
+                <span class="st run">Đang chạy</span>
+              </div>
+              <div class="ap-job" style="opacity:0.6">
+                <span class="time">19:30</span>
+                <div class="body">
+                  <div class="title">Milo #09 · Đã hoàn tất</div>
+                  <div class="meta">Đã đăng TikTok · 12.3K lượt xem</div>
+                </div>
+                <span class="chip ok" style="font-size:10px"><span class="d"></span>Pass QC</span>
+                <span class="st ok">Xong</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ PUBLISH ============ -->
+    <section class="view" data-view="publish">
+      <div class="page-head">
+        <div>
+          <h1>Đăng tải tự động</h1>
+          <p>Kết nối kênh · lên lịch · hệ thống tự đăng theo giờ vàng</p>
+        </div>
+        <div class="actions">
+          <button class="btn">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 8v4l3 3"/><circle cx="12" cy="12" r="9"/></svg>
+            Giờ vàng
+          </button>
+          <button class="btn primary">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
+            Kết nối kênh
+          </button>
+        </div>
+      </div>
+
+      <!-- Channels -->
+      <div class="channels-strip">
+        <div class="channel">
+          <div class="head">
+            <div class="logo tiktok">TT</div>
+            <div style="flex:1;min-width:0">
+              <div class="name">TikTok</div>
+              <div class="followers">@studio.ai · 42.3K</div>
+            </div>
+          </div>
+          <div class="foot"><span class="status ok"><span class="d" style="width:5px;height:5px;border-radius:50%;background:currentColor"></span>Đã kết nối</span><span class="last-post">3 phút trước</span></div>
+        </div>
+
+        <div class="channel">
+          <div class="head">
+            <div class="logo youtube">YT</div>
+            <div style="flex:1;min-width:0">
+              <div class="name">YouTube Shorts</div>
+              <div class="followers">Studio VN · 8.9K</div>
+            </div>
+          </div>
+          <div class="foot"><span class="status ok"><span class="d" style="width:5px;height:5px;border-radius:50%;background:currentColor"></span>Đã kết nối</span><span class="last-post">2 giờ trước</span></div>
+        </div>
+
+        <div class="channel">
+          <div class="head">
+            <div class="logo facebook">FB</div>
+            <div style="flex:1;min-width:0">
+              <div class="name">Facebook Reels</div>
+              <div class="followers">Studio AI · 12.1K</div>
+            </div>
+          </div>
+          <div class="foot"><span class="status ok"><span class="d" style="width:5px;height:5px;border-radius:50%;background:currentColor"></span>Đã kết nối</span><span class="last-post">1 ngày trước</span></div>
+        </div>
+
+        <div class="channel" style="border-color:rgba(251,191,36,0.3)">
+          <div class="head">
+            <div class="logo instagram">IG</div>
+            <div style="flex:1;min-width:0">
+              <div class="name">Instagram Reels</div>
+              <div class="followers">@studio.ai · 5.6K</div>
+            </div>
+          </div>
+          <div class="foot"><span class="status warn"><span class="d" style="width:5px;height:5px;border-radius:50%;background:currentColor"></span>Cần đăng nhập lại</span><span class="last-post">—</span></div>
+        </div>
+
+        <div class="channel add">
+          <div class="plus">+</div>
+          <div class="t">Thêm kênh</div>
+        </div>
+      </div>
+
+      <!-- Schedule + queue -->
+      <div class="pub-grid">
+        <div class="pub-schedule">
+          <div class="pub-tabs">
+            <div class="pub-tab on">Lịch tuần</div>
+            <div class="pub-tab">Hàng chờ</div>
+            <div class="pub-tab">Đã đăng</div>
+          </div>
+          <div class="pub-body">
+            <div class="pub-week">
+              <div class="pub-day">
+                <div class="dh"><span class="dow">T2</span><span class="dom">07</span></div>
+                <div class="pub-slot done"><span class="time">09:00</span><span class="title">Milo #08</span><div class="chans"><span class="tt">T</span><span class="yt">Y</span></div></div>
+                <div class="pub-slot done"><span class="time">21:00</span><span class="title">Milo #09</span><div class="chans"><span class="tt">T</span></div></div>
+              </div>
+              <div class="pub-day today">
+                <div class="dh"><span class="dow">T3</span><span class="dom">08</span></div>
+                <div class="pub-slot done"><span class="time">09:00</span><span class="title">Milo #10</span><div class="chans"><span class="tt">T</span><span class="yt">Y</span><span class="fb">F</span></div></div>
+                <div class="pub-slot"><span class="time">21:00</span><span class="title">Milo #11</span><div class="chans"><span class="tt">T</span><span class="yt">Y</span></div></div>
+                <div class="pub-slot"><span class="time">22:30</span><span class="title">Review son</span><div class="chans"><span class="tt">T</span><span class="sp">S</span></div></div>
+              </div>
+              <div class="pub-day">
+                <div class="dh"><span class="dow">T4</span><span class="dom">09</span></div>
+                <div class="pub-slot"><span class="time">09:00</span><span class="title">Milo #12</span><div class="chans"><span class="tt">T</span></div></div>
+                <div class="pub-slot"><span class="time">20:30</span><span class="title">Kiến thức</span><div class="chans"><span class="yt">Y</span><span class="fb">F</span></div></div>
+              </div>
+              <div class="pub-day">
+                <div class="dh"><span class="dow">T5</span><span class="dom">10</span></div>
+                <div class="pub-slot"><span class="time">21:00</span><span class="title">Milo #13</span><div class="chans"><span class="tt">T</span><span class="ig">I</span></div></div>
+              </div>
+              <div class="pub-day">
+                <div class="dh"><span class="dow">T6</span><span class="dom">11</span></div>
+                <div class="pub-slot"><span class="time">09:00</span><span class="title">Milo #14</span><div class="chans"><span class="tt">T</span><span class="yt">Y</span></div></div>
+                <div class="pub-slot"><span class="time">21:00</span><span class="title">Affiliate #03</span><div class="chans"><span class="tt">T</span><span class="sp">S</span></div></div>
+              </div>
+              <div class="pub-day">
+                <div class="dh"><span class="dow">T7</span><span class="dom">12</span></div>
+                <div class="pub-slot"><span class="time">10:00</span><span class="title">Milo #15</span><div class="chans"><span class="tt">T</span></div></div>
+              </div>
+              <div class="pub-day">
+                <div class="dh"><span class="dow">CN</span><span class="dom">13</span></div>
+                <div class="pub-slot"><span class="time">20:00</span><span class="title">Tổng hợp tuần</span><div class="chans"><span class="yt">Y</span><span class="fb">F</span></div></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="pub-queue">
+          <div class="card-head">
+            Hàng chờ
+            <span class="sub">· 5 video</span>
+            <span class="right"><span class="chip ok"><span class="d"></span>Tự chạy</span></span>
+          </div>
+          <div style="padding:12px">
+            <div class="queue-list">
+              <div class="queue-item">
+                <div class="queue-thumb"></div>
+                <div class="queue-body">
+                  <div class="queue-title">Milo cứu chú chim</div>
+                  <div class="queue-chips">
+                    <span class="mini tt">T</span><span class="mini yt">Y</span><span class="mini fb">F</span>
+                  </div>
+                  <div class="queue-meta"><span class="st sched">21:00</span>·2 kênh</div>
+                </div>
+              </div>
+              <div class="queue-item">
+                <div class="queue-thumb" style="background:linear-gradient(135deg,#3a2a10,#201508)"></div>
+                <div class="queue-body">
+                  <div class="queue-title">Review son dưỡng</div>
+                  <div class="queue-chips">
+                    <span class="mini tt">T</span><span class="mini sp">S</span>
+                  </div>
+                  <div class="queue-meta"><span class="st sched">22:30</span>·Có công bố FTC</div>
+                </div>
+              </div>
+              <div class="queue-item">
+                <div class="queue-thumb" style="background:linear-gradient(135deg,#1a2a3a,#101820)"></div>
+                <div class="queue-body">
+                  <div class="queue-title">Kiến thức #12</div>
+                  <div class="queue-chips">
+                    <span class="mini yt">Y</span><span class="mini fb">F</span>
+                  </div>
+                  <div class="queue-meta"><span class="st sched">Mai 20:30</span></div>
+                </div>
+              </div>
+              <div class="queue-item">
+                <div class="queue-thumb" style="background:linear-gradient(135deg,#2a1d3d,#1a1224)"></div>
+                <div class="queue-body">
+                  <div class="queue-title">Bí ẩn trong rừng</div>
+                  <div class="queue-chips">
+                    <span class="mini tt">T</span>
+                  </div>
+                  <div class="queue-meta"><span class="st run">Đang render</span></div>
+                </div>
+              </div>
+              <div class="queue-item">
+                <div class="queue-thumb" style="background:linear-gradient(135deg,#3a1d20,#20100e)"></div>
+                <div class="queue-body">
+                  <div class="queue-title">Studio Vlog #03</div>
+                  <div class="queue-chips">
+                    <span class="mini ig">I</span>
+                  </div>
+                  <div class="queue-meta"><span class="st err">Lỗi xác thực IG</span></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- History -->
+      <div class="sec-title mt-24">
+        <h2>Đã đăng 7 ngày qua</h2>
+        <span class="sub">23 video</span>
+        <span class="right">Xem tất cả →</span>
+      </div>
+      <div class="card">
+        <table class="hist-table">
+          <thead>
+            <tr>
+              <th>Video</th>
+              <th>Kênh</th>
+              <th>Thời gian</th>
+              <th style="text-align:right">Lượt xem</th>
+              <th style="text-align:right">Tương tác</th>
+              <th>Trạng thái</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td style="font-weight:500">Milo #09 · Đêm trong rừng</td>
+              <td><div style="display:flex;gap:4px"><span class="mini tt" style="width:20px;height:20px;border-radius:5px;display:grid;place-items:center;font-size:9px;font-weight:700;color:#fff;background:#000">T</span></div></td>
+              <td class="mono" style="font-size:11.5px;color:var(--t3)">Hôm nay 09:00</td>
+              <td class="mono" style="text-align:right;font-size:11.5px">12.3K</td>
+              <td class="mono" style="text-align:right;font-size:11.5px;color:#6ee7b7">+8.4%</td>
+              <td><span class="chip ok" style="font-size:10.5px"><span class="d"></span>Đang viral</span></td>
+            </tr>
+            <tr>
+              <td style="font-weight:500">Milo #08 · Bạn mới</td>
+              <td><div style="display:flex;gap:4px"><span style="width:20px;height:20px;border-radius:5px;display:grid;place-items:center;font-size:9px;font-weight:700;color:#fff;background:#000">T</span><span style="width:20px;height:20px;border-radius:5px;display:grid;place-items:center;font-size:9px;font-weight:700;color:#fff;background:#FF0000">Y</span></div></td>
+              <td class="mono" style="font-size:11.5px;color:var(--t3)">Hôm qua 09:00</td>
+              <td class="mono" style="text-align:right;font-size:11.5px">8.1K</td>
+              <td class="mono" style="text-align:right;font-size:11.5px;color:var(--t3)">+2.1%</td>
+              <td><span class="chip ok" style="font-size:10.5px"><span class="d"></span>Ổn định</span></td>
+            </tr>
+            <tr>
+              <td style="font-weight:500">Review son dưỡng #02</td>
+              <td><div style="display:flex;gap:4px"><span style="width:20px;height:20px;border-radius:5px;display:grid;place-items:center;font-size:9px;font-weight:700;color:#fff;background:#000">T</span><span style="width:20px;height:20px;border-radius:5px;display:grid;place-items:center;font-size:9px;font-weight:700;color:#fff;background:#EE4D2D">S</span></div></td>
+              <td class="mono" style="font-size:11.5px;color:var(--t3)">2 ngày trước</td>
+              <td class="mono" style="text-align:right;font-size:11.5px">24.7K</td>
+              <td class="mono" style="text-align:right;font-size:11.5px;color:#6ee7b7">+156 đơn</td>
+              <td><span class="chip pink" style="font-size:10.5px"><span class="d"></span>Bán chạy</span></td>
+            </tr>
+            <tr>
+              <td style="font-weight:500">Kiến thức #11 · Vì sao trời xanh</td>
+              <td><div style="display:flex;gap:4px"><span style="width:20px;height:20px;border-radius:5px;display:grid;place-items:center;font-size:9px;font-weight:700;color:#fff;background:#FF0000">Y</span><span style="width:20px;height:20px;border-radius:5px;display:grid;place-items:center;font-size:9px;font-weight:700;color:#fff;background:#1877F2">F</span></div></td>
+              <td class="mono" style="font-size:11.5px;color:var(--t3)">3 ngày trước</td>
+              <td class="mono" style="text-align:right;font-size:11.5px">5.6K</td>
+              <td class="mono" style="text-align:right;font-size:11.5px;color:var(--t3)">+0.8%</td>
+              <td><span class="chip ok" style="font-size:10.5px"><span class="d"></span>Ổn định</span></td>
+            </tr>
+            <tr>
+              <td style="font-weight:500">Studio Vlog #02</td>
+              <td><div style="display:flex;gap:4px"><span style="width:20px;height:20px;border-radius:5px;display:grid;place-items:center;font-size:9px;font-weight:700;color:#fff;background:linear-gradient(135deg,#833AB4,#E1306C)">I</span></div></td>
+              <td class="mono" style="font-size:11.5px;color:var(--t3)">4 ngày trước</td>
+              <td class="mono" style="text-align:right;font-size:11.5px;color:var(--t3)">—</td>
+              <td class="mono" style="text-align:right;font-size:11.5px;color:var(--t3)">—</td>
+              <td><span class="chip warn" style="font-size:10.5px"><span class="d"></span>Cần đăng nhập lại</span></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- ============ AFFILIATE ============ -->
+    <section class="view" data-view="affiliate">
+      <div class="page-head">
+        <div>
+          <h1>Affiliate Studio</h1>
+          <p>Biến sản phẩm thành video bán hàng · có công bố tiếp thị liên kết</p>
+        </div>
+        <div class="actions">
+          <button class="btn ghost">Hướng dẫn</button>
+        </div>
+      </div>
+
+      <div class="affil-layout">
+        <div class="form-panel">
+          <div class="form-head">
+            <span class="step">1</span>
+            <div>
+              <div class="title">Thông tin sản phẩm</div>
+              <div class="sub">Càng chi tiết AI viết càng sát</div>
+            </div>
+          </div>
+          <div class="form-body">
+            <div class="form-group">
+              <label class="form-label">Ảnh sản phẩm <span class="req">*</span></label>
+              <div class="uploaded">
+                <div class="thumb">🧴</div>
+                <div class="info"><div class="name">serum-abc.png</div><div class="size">1.2 MB · 1200×1200</div></div>
+                <div class="remove">✕</div>
+              </div>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Tên sản phẩm <span class="req">*</span></label>
+              <input class="form-input" value="Serum Vitamin C 20%">
+            </div>
+            <div class="form-group" style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+              <div><label class="form-label">Giá gốc</label><input class="form-input" value="499.000đ"></div>
+              <div><label class="form-label">Giá sale</label><input class="form-input" value="299.000đ"></div>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Điểm nổi bật <span class="hint">tối đa 3</span></label>
+              <textarea class="form-textarea">Làm sáng da sau 2 tuần · Không gây kích ứng · Thiết kế chai thuỷ tinh sang trọng</textarea>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Link sản phẩm <span class="hint">tuỳ chọn</span></label>
+              <input class="form-input" value="https://shopee.vn/serum-vitc-20">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Giọng điệu</label>
+              <div class="ap-chip-row">
+                <span class="chip">Chuyên nghiệp</span>
+                <span class="chip on">Thân thiện</span>
+                <span class="chip">Hài hước</span>
+                <span class="chip">Gấp gáp</span>
+              </div>
+            </div>
+            <button class="gen-btn">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M5.6 18.4l2.1-2.1M16.3 7.7l2.1-2.1"/></svg>
+              Tạo kịch bản video
+            </button>
+          </div>
+        </div>
+
+        <div class="affil-right">
+          <div class="affil-stage">
+            <div class="affil-phone">
+              <div class="affil-scene"></div>
+              <span class="affil-badge-corner">Quảng cáo · Affiliate</span>
+              <div class="affil-headline">
+                <div class="line1">Serum Vitamin C 20%</div>
+                <div class="line2">Sáng da sau 2 tuần<br>Không kích ứng</div>
+              </div>
+              <div class="affil-discount">-40%<small>GIẢM</small></div>
+              <div class="affil-product"><span class="icon">🧴</span></div>
+              <div class="affil-price"><span class="old">499.000đ</span><span class="new"><small>₫</small>299.000</span></div>
+              <div class="affil-cta">Mua ngay tại Shopee →</div>
+              <div class="affil-sub"><span class="pill">"Da mình sáng rõ chỉ sau 2 tuần dùng thử"</span></div>
+              <div class="affil-ftc">Người giới thiệu có thể nhận hoa hồng từ đơn hàng</div>
+            </div>
+            <div class="affil-side">
+              <div class="info-block">
+                <div class="k">Hook đề xuất · chọn 1</div>
+                <div class="hook-opt on"><span class="radio"></span><span>"Mình vừa tìm được em serum đỉnh nhất 2026, giá chỉ bằng 1 tô phở…"</span></div>
+                <div class="hook-opt"><span class="radio"></span><span>"Da mình từng xỉn cả 1 năm, cho đến khi gặp đúng em này."</span></div>
+                <div class="hook-opt"><span class="radio"></span><span>"3 điều bạn nên biết trước khi mua serum Vitamin C."</span></div>
+              </div>
+              <div class="info-block">
+                <div class="k">Cấu trúc · 22 giây · TikTok</div>
+                <div style="display:flex;flex-direction:column;gap:6px">
+                  <div style="display:grid;grid-template-columns:28px 1fr auto;gap:10px;align-items:center;padding:6px 0;border-bottom:1px dashed var(--line);font-size:12px"><span class="mono t3" style="font-size:10.5px">01</span><span>Hook · nói vào camera</span><span class="chip ok" style="font-size:10px;padding:2px 6px">Xong</span></div>
+                  <div style="display:grid;grid-template-columns:28px 1fr auto;gap:10px;align-items:center;padding:6px 0;border-bottom:1px dashed var(--line);font-size:12px"><span class="mono t3" style="font-size:10.5px">02</span><span>Vấn đề · da xỉn màu</span><span class="chip ok" style="font-size:10px;padding:2px 6px">Xong</span></div>
+                  <div style="display:grid;grid-template-columns:28px 1fr auto;gap:10px;align-items:center;padding:6px 0;border-bottom:1px dashed var(--line);font-size:12px"><span class="mono t3" style="font-size:10.5px">03</span><span>Cận cảnh sản phẩm</span><span class="chip info" style="font-size:10px;padding:2px 6px">Dựng…</span></div>
+                  <div style="display:grid;grid-template-columns:28px 1fr auto;gap:10px;align-items:center;padding:6px 0;font-size:12px"><span class="mono t3" style="font-size:10.5px">04</span><span>CTA · giá + link</span><span class="chip" style="font-size:10px;padding:2px 6px">Chờ</span></div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="ftc-panel">
+            <div class="ico">⚖️</div>
+            <div class="body">
+              <div class="title">Công bố tiếp thị liên kết</div>
+              <div class="desc">Bật để chèn dòng công bố vào video và metadata. Yêu cầu bắt buộc ở nhiều nền tảng.</div>
+            </div>
+            <div class="toggle on"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ MODELS ============ -->
+    <section class="view" data-view="models">
+      <div class="page-head">
+        <div>
+          <h1>Mô hình AI</h1>
+          <p>Bạn dùng khoá API riêng · được mã hoá, không hiển thị lại</p>
+        </div>
+        <div class="actions">
+          <button class="btn primary">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
+            Thêm nhà cung cấp
+          </button>
+        </div>
+      </div>
+
+      <div class="provider-list">
+        <div class="provider">
+          <div class="prov-logo or">OR</div>
+          <div class="prov-info"><div class="name">OpenRouter</div><div class="desc">Viết truyện, kịch bản, phân tích hình ảnh</div></div>
+          <div class="prov-models"><span class="chip" style="font-size:10.5px">Claude Sonnet</span><span class="chip" style="font-size:10.5px">GPT-4o</span><span class="chip" style="font-size:10.5px">Gemini Pro</span></div>
+          <span class="chip ok"><span class="d"></span>Đã kết nối</span>
+        </div>
+        <div class="provider">
+          <div class="prov-logo el">11</div>
+          <div class="prov-info"><div class="name">ElevenLabs</div><div class="desc">Giọng đọc tiếng Việt tự nhiên</div></div>
+          <div class="prov-models"><span class="chip" style="font-size:10.5px">Turbo v2.5</span><span class="chip" style="font-size:10.5px">6 giọng VI</span></div>
+          <span class="chip ok"><span class="d"></span>Đã kết nối</span>
+        </div>
+        <div class="provider">
+          <div class="prov-logo fa">FA</div>
+          <div class="prov-info"><div class="name">fal.ai</div><div class="desc">Tạo ảnh và video · đang dùng cho Milo</div></div>
+          <div class="prov-models"><span class="chip" style="font-size:10.5px">FLUX Pro</span><span class="chip" style="font-size:10.5px">Kling v1</span></div>
+          <span class="chip ok"><span class="d"></span>Đã kết nối</span>
+        </div>
+        <div class="provider" style="border-color:rgba(251,191,36,0.28)">
+          <div class="prov-logo rp">RP</div>
+          <div class="prov-info"><div class="name">Replicate</div><div class="desc">Tạo ảnh dự phòng · tạm nghỉ do hết quota</div></div>
+          <div class="prov-models"><span class="chip" style="font-size:10.5px">SDXL</span></div>
+          <span class="chip warn"><span class="d"></span>Tạm nghỉ</span>
+        </div>
+        <div class="provider" style="border-style:dashed">
+          <div class="prov-logo hf" style="opacity:0.5">HF</div>
+          <div class="prov-info"><div class="name" style="color:var(--t2)">Hugging Face</div><div class="desc">Chưa cấu hình · bấm để thêm khoá API</div></div>
+          <div></div>
+          <span class="chip"><span class="d" style="background:var(--t3);box-shadow:none"></span>Chưa kết nối</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ ACTIVITY ============ -->
+    <section class="view" data-view="activity">
+      <div class="page-head">
+        <div>
+          <h1>Hoạt động AI</h1>
+          <p>Nhật ký mọi yêu cầu · không bao giờ hiển thị khoá API</p>
+        </div>
+        <div class="actions">
+          <span class="chip info"><span class="d"></span>Đang kết nối trực tiếp</span>
+          <button class="btn">Xuất log</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <table class="activity-table">
+          <thead>
+            <tr><th style="width:90px">Thời gian</th><th>Nhiệm vụ</th><th>Mô hình</th><th style="width:130px">Trạng thái</th><th style="width:80px;text-align:right">Thời gian</th></tr>
+          </thead>
+          <tbody>
+            <tr><td class="time">19:03:21</td><td class="task">Viết cốt truyện</td><td class="model">openrouter · claude-sonnet-4</td><td><span class="chip ok" style="font-size:10.5px"><span class="d"></span>Thành công</span></td><td class="lat">1.8s</td></tr>
+            <tr><td class="time">19:03:26</td><td class="task">Tạo hình ảnh · cảnh 03</td><td class="model">replicate · sdxl</td><td><span class="chip warn" style="font-size:10.5px"><span class="d"></span>Hết quota</span></td><td class="lat">0.4s</td></tr>
+            <tr class="fallback-row"><td class="time" style="padding-left:24px">19:03:27</td><td class="task">Tạo hình ảnh · cảnh 03</td><td class="model">fal.ai · flux-pro/v1.1 <span class="t3">(dự phòng)</span></td><td><span class="chip ok" style="font-size:10.5px"><span class="d"></span>Thành công</span></td><td class="lat">4.2s</td></tr>
+            <tr><td class="time">19:03:32</td><td class="task">Giọng đọc · cảnh 03</td><td class="model">elevenlabs · turbo_v2_5</td><td><span class="chip ok" style="font-size:10.5px"><span class="d"></span>Thành công</span></td><td class="lat">2.1s</td></tr>
+            <tr><td class="time">19:03:36</td><td class="task">Phụ đề · cảnh 03</td><td class="model">cục bộ · canh từ audio thật</td><td><span class="chip ok" style="font-size:10.5px"><span class="d"></span>Thành công</span></td><td class="lat">0.2s</td></tr>
+            <tr><td class="time">19:03:41</td><td class="task">Video · cảnh 04</td><td class="model">fal.ai · kling-v1</td><td><span class="chip err" style="font-size:10.5px"><span class="d"></span>Hết thời gian</span></td><td class="lat">30.0s</td></tr>
+            <tr class="fallback-row"><td class="time" style="padding-left:24px">19:03:42</td><td class="task">Video · cảnh 04</td><td class="model">replicate · minimax/video-01 <span class="t3">(dự phòng)</span></td><td><span class="chip info" style="font-size:10.5px"><span class="d"></span>Đang chạy</span></td><td class="lat">…</td></tr>
+            <tr><td class="time">19:04:01</td><td class="task">Đăng TikTok</td><td class="model">publish · @studio.ai</td><td><span class="chip ok" style="font-size:10.5px"><span class="d"></span>Đã đăng</span></td><td class="lat">2.3s</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<script>
+/* NAV */
+const navItems = document.querySelectorAll('.nav-item');
+const views = document.querySelectorAll('.view');
+const crumbPage = document.getElementById('crumb-page');
+const pageNames = {home:'Trang chủ',studio:'Studio',autopilot:'Auto Pilot',publish:'Đăng tải tự động',affiliate:'Affiliate Studio',models:'Mô hình AI',activity:'Hoạt động'};
+
+function switchView(name){
+  navItems.forEach(n => n.classList.toggle('on', n.dataset.nav === name));
+  views.forEach(v => v.classList.toggle('on', v.dataset.view === name));
+  crumbPage.textContent = pageNames[name] || '';
+}
+navItems.forEach(item => item.addEventListener('click', () => switchView(item.dataset.nav)));
+
+/* Project card → studio */
+document.querySelectorAll('.project-card[data-goto]').forEach(card => {
+  card.addEventListener('click', () => switchView(card.dataset.goto));
+});
+
+/* Scene item select */
+document.querySelectorAll('.scene-item').forEach(item => {
+  item.addEventListener('click', () => {
+    document.querySelectorAll('.scene-item').forEach(x => x.classList.remove('on'));
+    item.classList.add('on');
+  });
+});
+
+/* Segmented control */
+document.querySelectorAll('.seg').forEach(seg => {
+  seg.querySelectorAll('button').forEach(btn => {
+    btn.addEventListener('click', () => {
+      seg.querySelectorAll('button').forEach(b => b.classList.remove('on'));
+      btn.classList.add('on');
+    });
+  });
+});
+
+/* Prop chips */
+document.querySelectorAll('.prop-chips').forEach(group => {
+  group.querySelectorAll('.chip').forEach(chip => chip.addEventListener('click', () => chip.classList.toggle('on')));
+});
+
+/* Autopilot chips + tone chips */
+document.querySelectorAll('.ap-chip-row').forEach(group => {
+  group.querySelectorAll('.chip').forEach(chip => {
+    chip.addEventListener('click', () => {
+      group.querySelectorAll('.chip').forEach(c => c.classList.remove('on'));
+      chip.classList.add('on');
+    });
+  });
+});
+
+/* Toggle buttons */
+document.querySelectorAll('.toggle').forEach(t => {
+  t.addEventListener('click', () => t.classList.toggle('on'));
+});
+
+/* Hook radio */
+document.querySelectorAll('.hook-opt').forEach(hook => {
+  hook.addEventListener('click', () => {
+    document.querySelectorAll('.hook-opt').forEach(h => h.classList.remove('on'));
+    hook.classList.add('on');
+  });
+});
+
+/* Publish tabs */
+document.querySelectorAll('.pub-tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    tab.parentElement.querySelectorAll('.pub-tab').forEach(t => t.classList.remove('on'));
+    tab.classList.add('on');
+  });
+});
+
+/* Slider value */
+document.querySelectorAll('.slider-row input[type=range]').forEach(input => {
+  input.addEventListener('input', e => {
+    const v = e.target.parentElement.querySelector('.v');
+    if (v) v.textContent = parseFloat(e.target.value).toFixed(1) + 's';
+  });
+});
+
+/* Channel click */
+document.querySelectorAll('.channel:not(.add)').forEach(ch => {
+  ch.addEventListener('click', () => ch.style.opacity = '0.7');
+});
+</script>
+</body>
+</html>

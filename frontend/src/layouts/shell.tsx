@@ -10,13 +10,14 @@ import {
   LayoutDashboard,
   ListVideo,
   Play,
+  Plus,
   Route,
   Search,
   Send,
   Settings,
   ShoppingCart,
 } from 'lucide-react'
-import { Link, NavLink, Outlet, useLocation } from 'react-router-dom'
+import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { api } from '../api/client'
 import { CommandPalette } from '../components/palette'
 import { Toasts } from '../components/toasts'
@@ -93,7 +94,7 @@ const NAV: { group: string; items: NavItem[] }[] = [
   ] },
 ]
 
-function Item({ to, label, icon: Icon, end }: NavItem) {
+function Item({ to, label, icon: Icon, end, badge }: NavItem & { badge?: string | null }) {
   return (
     <NavLink
       to={to}
@@ -102,7 +103,7 @@ function Item({ to, label, icon: Icon, end }: NavItem) {
         `group relative flex items-center gap-3 rounded-xl px-3 py-2 text-[14px] leading-5 ` +
         `transition-[background-color,color] duration-hover ease-out ` +
         (isActive
-          ? 'bg-elevated font-semibold text-ink shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]'
+          ? 'bg-accent/10 font-semibold text-ink'
           : 'font-medium text-secondary hover:bg-raised hover:text-ink')
       }
     >
@@ -123,6 +124,11 @@ function Item({ to, label, icon: Icon, end }: NavItem) {
             }
           />
           <span className="truncate">{label}</span>
+          {badge ? (
+            <span className="mono ml-auto shrink-0 rounded-full bg-raised px-2 py-0.5 text-[10.5px] font-medium text-secondary">
+              {badge}
+            </span>
+          ) : null}
         </>
       )}
     </NavLink>
@@ -158,7 +164,19 @@ function SystemPill() {
 
 export function Shell() {
   const { pathname } = useLocation()
+  const navigate = useNavigate()
   const setPalette = useUi((s) => s.setPalette)
+  const jobsLive = useQuery({
+    queryKey: ['jobs-shell'],
+    queryFn: () => api.jobs(),
+    staleTime: 30000,
+    refetchInterval: 30000,
+    retry: 1,
+    refetchOnWindowFocus: false,
+  })
+  const activeJobs = (jobsLive.data?.data ?? []).filter(
+    (j) => j.status === 'RUNNING' || j.status === 'QUEUED').length
+  const queueBadge = activeJobs > 0 ? String(activeJobs) : null
   const crumbs: Record<string, string> = {
     '/': t('nav.dashboard'),
     '/story': t('nav.story'),
@@ -183,7 +201,7 @@ export function Shell() {
     <div className="flex min-h-screen bg-bg text-ink">
       <aside className="sticky top-0 hidden h-screen w-[248px] shrink-0 flex-col border-r border-border bg-chrome md:flex" aria-label={t('nav.sidebar')}>
         <div className="flex items-center gap-3 px-4 pb-4 pt-5">
-          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-[#F2793C] to-[#B34A1E] text-[#1A0E07] shadow-[0_4px_16px_-4px_rgba(242,121,60,0.5)]">
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-[#8B7CF6] to-[#22D3EE] text-white shadow-[0_4px_16px_-4px_rgba(139,124,246,0.5)]">
             <Clapperboard className="h-5 w-5" strokeWidth={2.2} aria-hidden="true" />
           </span>
           <div className="min-w-0 leading-tight">
@@ -191,12 +209,24 @@ export function Shell() {
             <p className="truncate text-[11px] font-medium text-secondary">{t('app.subtitle')}</p>
           </div>
         </div>
+        <button
+          onClick={() => navigate('/story')}
+          className="mx-3 mb-4 flex items-center gap-2.5 rounded-xl border border-border bg-raised px-3.5 py-2.5 text-[13.5px] font-medium transition-colors duration-hover hover:bg-elevated hover:text-ink"
+        >
+          <span className="flex h-[18px] w-[18px] items-center justify-center rounded-md bg-gradient-to-br from-[#8B7CF6] to-[#22D3EE] text-white">
+            <Plus className="h-3 w-3" strokeWidth={3} aria-hidden="true" />
+          </span>
+          <span className="flex-1 text-left">{t('nav.new')}</span>
+          <Kbd className="bg-panel font-mono text-[10px]">N</Kbd>
+        </button>
         <nav className="flex-1 space-y-4 overflow-y-auto px-3 py-2">
           {NAV.map((g) => (
             <section key={g.group}>
               <p className="section-label mb-1.5">{g.group}</p>
               <div className="space-y-0.5">
-                {g.items.map((it) => <Item key={it.to} {...it} />)}
+                {g.items.map((it) => (
+                  <Item key={it.to} {...it} badge={it.to === '/queue' ? queueBadge : null} />
+                ))}
               </div>
             </section>
           ))}
