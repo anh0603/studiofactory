@@ -76,6 +76,40 @@ def test_script_reorder(client):
     assert client.patch("/api/v1/affiliate/scripts/nope", json={"position": 0}).status_code == 404
 
 
+def test_ai_quotas_unreachable_without_db(client, tmp_path, monkeypatch):
+    import app.api.v1.ai as ai_api
+    monkeypatch.setattr(ai_api, "_freellmapi_db_path", lambda: None)
+    res = client.get("/api/v1/ai/quotas")
+    assert res.status_code == 200
+    assert res.json()["data"] == {"source": "freellmapi-local", "reachable": False,
+                                  "providers": []}
+
+
+def test_ai_quotas_reads_local_ledger(client, tmp_path, monkeypatch):
+    import sqlite3
+    import app.api.v1.ai as ai_api
+    db_path = tmp_path / "freeapi.db"
+    c = sqlite3.connect(str(db_path))
+    c.execute("CREATE TABLE api_keys (platform TEXT, status TEXT, enabled INTEGER)")
+    c.execute("CREATE TABLE rate_limit_cooldowns (platform TEXT, model_id TEXT, expires_at_ms INTEGER)")
+    c.execute("CREATE TABLE rate_limit_usage (platform TEXT, kind TEXT, tokens INTEGER, created_at_ms INTEGER)")
+    c.execute("CREATE TABLE provider_quota_state (platform TEXT, quota_pool_key TEXT, metric TEXT, limit_value INTEGER, remaining_value INTEGER, reset_at TEXT, confidence REAL)")
+    c.execute("INSERT INTO api_keys VALUES ('groq', 'healthy', 1)")
+    c.execute("INSERT INTO rate_limit_usage VALUES ('groq', 'request', 0, 9999999999999)")
+    c.execute("INSERT INTO rate_limit_usage VALUES ('groq', 'tokens', 500, 9999999999999)")
+    c.commit()
+    c.close()
+    monkeypatch.setattr(ai_api, "_freellmapi_db_path", lambda: str(db_path))
+    res = client.get("/api/v1/ai/quotas")
+    assert res.status_code == 200, res.text
+    data = res.json()["data"]
+    assert data["reachable"] is True
+    groq = next(p for p in data["providers"] if p["platform"] == "groq")
+    assert groq["key_status"] == "healthy"
+    assert groq["usage_24h"] == {"requests": 1, "tokens": 500}
+    assert groq["quotas"] == []  # unknown limits are omitted, never invented
+
+
 def test_files_guards(client):
     assert client.get("/api/v1/artifacts/nope!/content").status_code == 400
     assert client.get("/api/v1/artifacts/art_missing/content").status_code == 404

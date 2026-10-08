@@ -113,6 +113,10 @@ export function AiModelsPage() {
   const providers = useQuery({ queryKey: ['providers'], queryFn: api.providers })
   const models = useQuery({ queryKey: ['models'], queryFn: api.models })
   const usage = useQuery({ queryKey: ['ai-usage'], queryFn: api.usage })
+  const quotas = useQuery({
+    queryKey: ['ai-quotas'], queryFn: api.quotas,
+    refetchInterval: 30000, retry: 1, refetchOnWindowFocus: false,
+  })
 
   const [showAdd, setShowAdd] = useState(false)
   const [showCustom, setShowCustom] = useState(false)
@@ -344,9 +348,9 @@ export function AiModelsPage() {
       </div>
 
       {showAdd || providerList.length === 0 ? (
-        <Card>
-          <div className="mb-2.5 flex items-center justify-between gap-2">
-            <h2 className="section-title">Thêm nhà cung cấp</h2>
+      <Card>
+        <div className="mb-2.5 flex items-center justify-between gap-2">
+          <h2 className="section-title">Thêm nhà cung cấp</h2>
             {showAdd && providerList.length > 0 ? (
               <Btn variant="link" onClick={() => setShowAdd(false)}>Đóng</Btn>
             ) : null}
@@ -428,6 +432,55 @@ export function AiModelsPage() {
           ) : null}
         </Card>
       ) : null}
+
+      {/* Upstream free-tier quotas, mirrored read-only from local FreeLLMAPI. */}
+      <Card>
+        <h2 className="section-title mb-1">Hạn mức dùng</h2>
+        <p className="mb-2.5 text-[13px] text-secondary">
+          Số liệu từ bộ điều phối FreeLLMAPI trên máy này. Nhà cung cấp không công bố hạn mức thì ghi “không rõ”, không bịa số.
+        </p>
+        {!quotas.data ? (
+          <p className="text-[13px] text-muted">Chưa đọc được hạn mức.</p>
+        ) : !quotas.data.data.reachable ? (
+          <p className="text-[13px] text-muted">FreeLLMAPI chưa chạy nên chưa có số hạn mức.</p>
+        ) : (
+          <ul className="space-y-2">
+            {quotas.data.data.providers.map((q) => {
+              const cooling = q.cooldowns.length > 0
+              return (
+                <li key={q.platform} className="rounded-lg border border-border bg-panel px-3 py-2.5">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <p className="text-sm font-semibold capitalize">{q.platform}</p>
+                    <span className={`badge ${q.key_status === 'healthy' ? 'badge-ok' : q.key_status === 'rate_limited' || cooling ? 'badge-warn' : 'badge-info'}`}>
+                      {q.key_status === 'healthy' && !cooling ? 'Khoá tốt'
+                        : q.key_status === 'rate_limited' || cooling ? 'Đang nghỉ do giới hạn'
+                        : q.key_status === 'invalid' ? 'Khoá lỗi'
+                        : q.key_status}
+                    </span>
+                    <span className="mono ml-auto text-muted">
+                      24h: {q.usage_24h.requests} lượt · {q.usage_24h.tokens.toLocaleString('vi-VN')} token
+                    </span>
+                  </div>
+                  {q.cooldowns.length > 0 ? (
+                    <p className="mono mt-1 text-muted">
+                      Nghỉ tới: {q.cooldowns.map((c) => `${c.model} (${new Date(c.until_ms).toLocaleTimeString('vi-VN')})`).join(' · ')}
+                    </p>
+                  ) : null}
+                  {q.quotas.filter((l) => l.limit != null || l.remaining != null).map((l, i) => (
+                    <p key={i} className="mono mt-1 text-muted">
+                      {l.pool ?? ''} {l.metric ?? ''}: còn {l.remaining ?? '?'} / {l.limit ?? '?'}
+                      {l.reset_at ? ` · hồi ${l.reset_at}` : ''}
+                    </p>
+                  ))}
+                  {q.quotas.every((l) => l.limit == null && l.remaining == null) ? (
+                    <p className="mt-1 text-[12px] text-muted">Hạn mức còn lại: không rõ (nhà cung cấp không công bố).</p>
+                  ) : null}
+                </li>
+              )
+            })}
+          </ul>
+        )}
+      </Card>
 
       <Card>
         <h2 className="section-title mb-1">Mô hình ({modelList.length})</h2>

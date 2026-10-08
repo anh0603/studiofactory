@@ -489,3 +489,89 @@ def usage(request: Request, db: Session = Depends(get_db)) -> dict:
                       "last_used_at": str(last) if last else None}
                      for m, n, ok, lat, last in by_model],
         "cost": None, "cost_state": "UNKNOWN"}}
+
+
+def _freellmapi_db_path() -> str | None:
+    """Locate the sibling FreeLLMAPI database (local dev integration).
+
+    Read-only consumers only. FREELLMAPI_DB env wins, else the conventional
+    sibling checkout layout. None when absent — callers report UNAVAILABLE.
+    """
+    import os
+    env = (os.environ.get("FREELLMAPI_DB") or "").strip()
+    cands = [env] if env else []
+    cands.append(os.path.join(os.getcwd(), "..", "freellmapi", "server", "data", "freeapi.db"))
+    for c in cands:
+        try:
+            if c and os.path.isfile(c):
+                return c
+        except Exception:  # noqa: BLE001
+            pass
+    return None
+
+
+@router.get("/quotas")
+def quotas(request: Request) -> dict:
+    """Upstream free-tier quota visibility, mirrored read-only from the local
+    FreeLLMAPI database (its own rate/quota ledger). No secrets leave that
+    database: only platform names, key health states, cooldowns, counters
+    and provider-reported limits. Anything unreadable -> UNAVAILABLE, and a
+    missing limit is reported as unknown, never invented."""
+    import sqlite3
+    import time
+    path = _freellmapi_db_path()
+    if path is None:
+        return {"request_id": _rid(request),
+                "data": {"source": "freellmapi-local", "reachable": False,
+                         "providers": []}}
+    providers: list[dict] = []
+    try:
+        conn = sqlite3.connect(f"file:{path}?mode=ro", uri=True, timeout=5.0)
+        try:
+            keys = {p: (s, e) for p, s, e in
+                    conn.execute("SELECT platform, status, enabled FROM api_keys").fetchall()}
+            now_ms = int(time.time() * 1000)
+            cools = {}
+            for plat, model, exp in conn.execute(
+                    "SELECT platform, model_id, expires_at_ms FROM rate_limit_cooldowns").fetchall():
+                if exp and exp > now_ms:
+                    cools.setdefault(plat, []).append({"model": model, "until_ms": exp})
+            day_ago = int((time.time() - 86400) * 1000)
+            use24: dict = {}
+            for plat, kind, tokens in conn.execute(
+                    "SELECT platform, kind, COALESCE(tokens, 0) FROM rate_limit_usage "
+                    "WHERE created_at_ms IS NULL OR created_at_ms >= ?",
+                    (day_ago,)).fetchall():
+                u = use24.setdefault(plat, {"requests": 0, "tokens": 0})
+                if kind == "request":
+                    u["requests"] += 1
+                else:
+                    try:
+                        u["tokens"] += int(tokens or 0)
+                    except (TypeError, ValueError):
+                        pass
+            quotas: dict = {}
+            for plat, pool, metric, lim, rem, reset, conf in conn.execute(
+                    "SELECT platform, quota_pool_key, metric, limit_value, remaining_value, "
+                    "reset_at, confidence FROM provider_quota_state").fetchall():
+                quotas.setdefault(plat, []).append(
+                    {"pool": pool, "metric": metric, "limit": lim, "remaining": rem,
+                     "reset_at": reset, "confidence": conf})
+        finally:
+            conn.close()
+    except Exception:  # noqa: BLE001 - foreign schema, lock, anything
+        return {"request_id": _rid(request),
+                "data": {"source": "freellmapi-local", "reachable": False,
+                         "providers": []}}
+    for plat in sorted(set(list(keys) + list(cools) + list(use24) + list(quotas))):
+        st, en = keys.get(plat, ("unknown", 0))
+        providers.append({
+            "platform": plat,
+            "key_status": st, "key_enabled": bool(en),
+            "cooldowns": cools.get(plat, []),
+            "usage_24h": use24.get(plat, {"requests": 0, "tokens": 0}),
+            "quotas": quotas.get(plat, []),
+        })
+    return {"request_id": _rid(request),
+            "data": {"source": "freellmapi-local", "reachable": True,
+                     "providers": providers}}

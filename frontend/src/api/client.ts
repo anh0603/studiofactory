@@ -78,6 +78,7 @@ export const api = {
   activity: () =>
     request<{ request_id: string; data: ActivityEvent[] }>('/api/v1/ai/activity?limit=50'),
   usage: () => request<{ request_id: string; data: UsageSummary }>('/api/v1/ai/usage'),
+  quotas: () => request<{ request_id: string; data: QuotaOverview }>('/api/v1/ai/quotas'),
   // --- Story Factory (Phase 3, real APIs) ---
   projects: () => request<{ request_id: string; data: Project[] }>('/api/v1/projects'),
   createProject: (body: Record<string, unknown>) =>
@@ -540,6 +541,21 @@ export interface UsageSummary {
   by_model: { model: string; count: number; successful?: number; avg_latency_ms?: number; last_used_at?: string | null }[]
   cost: number | null
   cost_state: string
+}
+
+export interface QuotaProvider {
+  platform: string
+  key_status: string
+  key_enabled: boolean
+  cooldowns: { model: string; until_ms: number }[]
+  usage_24h: { requests: number; tokens: number }
+  quotas: { pool: string | null; metric: string | null; limit: number | null; remaining: number | null; reset_at: string | null; confidence: number | null }[]
+}
+
+export interface QuotaOverview {
+  source: string
+  reachable: boolean
+  providers: QuotaProvider[]
 }
 
 export interface Project {
