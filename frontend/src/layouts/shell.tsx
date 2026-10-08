@@ -66,18 +66,14 @@ function IconGear(p: IconProps) {
 type NavItem = { to: string; label: string; icon: (p: IconProps) => JSX.Element; end?: boolean }
 
 const NAV: { group: string; items: NavItem[] }[] = [
-  { group: t('nav.overview'), items: [
+  { group: t('nav.produce'), items: [
     { to: '/', label: t('nav.dashboard'), icon: IconGauge, end: true },
-  ] },
-  { group: t('nav.story'), items: [
     { to: '/story', label: t('nav.story.projects'), icon: IconBook },
-  ] },
-  { group: t('nav.affiliate'), items: [
     { to: '/affiliate', label: t('nav.affiliate.products'), icon: IconCart },
   ] },
   { group: t('nav.automation'), items: [
-    { to: '/queue', label: t('nav.queue'), icon: IconList },
     { to: '/autopilot', label: t('nav.autopilot'), icon: IconPlay },
+    { to: '/queue', label: t('nav.queue'), icon: IconList },
     { to: '/scheduler', label: t('nav.scheduler'), icon: IconClock },
     { to: '/publisher', label: t('nav.publisher'), icon: IconUpload },
   ] },
@@ -85,10 +81,8 @@ const NAV: { group: string; items: NavItem[] }[] = [
     { to: '/ai/models', label: t('nav.ai.models'), icon: IconChip },
     { to: '/ai/router', label: t('nav.ai.router'), icon: IconRoute },
   ] },
-  { group: t('nav.analytics'), items: [
-    { to: '/analytics', label: t('nav.analytics.overview'), icon: IconChart },
-  ] },
   { group: t('nav.system'), items: [
+    { to: '/analytics', label: t('nav.analytics.overview'), icon: IconChart },
     { to: '/diagnostics', label: t('nav.diagnostics'), icon: IconPulse },
     { to: '/settings', label: t('nav.settings'), icon: IconGear },
   ] },

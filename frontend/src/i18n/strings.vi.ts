@@ -24,6 +24,7 @@ export const strings = {
   'nav.settings': 'Cài đặt',
   'nav.sidebar': 'Điều hướng chính',
   'nav.new': 'Tạo video mới',
+  'nav.produce': 'Sản xuất',
   'nav.hint': 'Nhấn',
   'nav.hint.kbd': 'để mở bảng lệnh nhanh',
   'dashboard.hero': 'Nhà máy của bạn đã sẵn sàng.',
