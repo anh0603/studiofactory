@@ -274,6 +274,11 @@ export const api = {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({}),
     }),
+  afReviseScript: (videoId: string, message: string) =>
+    request<{ request_id: string; data: AfScript }>(`/api/v1/affiliate/videos/${videoId}/revise`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message }),
+    }),
   affiliateFileUrl: (videoId: string) =>
     `/api/v1/affiliate/videos/${videoId}/file/content`,
   afExportVideo: (videoId: string) =>
@@ -426,6 +431,7 @@ export interface AfVideo {
   video_path?: string | null
   has_video?: boolean
   duration_s?: number | null
+  progress?: number | null
 }
 
 export interface AnalyticsOverview {
@@ -503,7 +509,7 @@ export interface UsageSummary {
   failed: number
   fallbacks: number
   avg_latency_ms: number
-  by_model: { model: string; count: number }[]
+  by_model: { model: string; count: number; successful?: number; avg_latency_ms?: number; last_used_at?: string | null }[]
   cost: number | null
   cost_state: string
 }

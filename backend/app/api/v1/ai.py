@@ -475,11 +475,17 @@ def usage(request: Request, db: Session = Depends(get_db)) -> dict:
     # Breakdown by model only counts rows that actually named a provider/model.
     # Pre-network BLOCKED rows have none and would otherwise appear as "" entries.
     by_model = db.execute(
-        select(M.UsageEvent.model, func.count().label("n"))
+        select(M.UsageEvent.model, func.count().label("n"),
+               func.sum(M.UsageEvent.status == "SUCCESS").label("ok"),
+               func.avg(M.UsageEvent.latency_ms).label("lat"),
+               func.max(M.UsageEvent.created_at).label("last"))
         .where(M.UsageEvent.model != "")
         .group_by(M.UsageEvent.model)).all()
     return {"request_id": _rid(request), "data": {
         "requests": total, "successful": success, "failed": total - success,
         "fallbacks": fallbacks, "avg_latency_ms": round(float(avg_lat or 0), 1),
-        "by_model": [{"model": m, "count": n} for m, n in by_model],
+        "by_model": [{"model": m, "count": n, "successful": int(ok or 0),
+                      "avg_latency_ms": round(float(lat or 0), 1),
+                      "last_used_at": str(last) if last else None}
+                     for m, n, ok, lat, last in by_model],
         "cost": None, "cost_state": "UNKNOWN"}}

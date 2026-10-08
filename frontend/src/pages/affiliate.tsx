@@ -1,8 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { GripVertical, ImagePlus } from 'lucide-react'
+import { GripVertical, ImagePlus, Send } from 'lucide-react'
 import { useState } from 'react'
 import { api } from '../api/client'
-import type { AfScript } from '../api/client'
+import type { AfScript, AfVideo } from '../api/client'
 import { EmptyState } from '../components/states'
 import { Btn, Card, Field, PageHeader, Select, StatusBadge } from '../components/ui'
 import { VideoPlayer } from '../components/player'
@@ -12,6 +12,162 @@ const STYLES: Record<string, string> = {
   REVIEW: 'Đánh giá', UGC: 'Người dùng thật', PROBLEM_SOLUTION: 'Vấn đề và giải pháp',
   SHOWCASE: 'Trình diễn sản phẩm', COMPARISON: 'So sánh', STORYTELLING: 'Kể chuyện',
   TOP_PRODUCT: 'Sản phẩm nổi bật',
+}
+
+function ProgressRing({ pct }: { pct: number }) {
+  const r = 26
+  const c = 2 * Math.PI * r
+  return (
+    <svg width="72" height="72" viewBox="0 0 72 72" role="img" aria-label={`Hoàn thành ${pct}%`}>
+      <circle cx="36" cy="36" r={r} fill="none" strokeWidth="7" className="stroke-border" />
+      <circle
+        cx="36" cy="36" r={r} fill="none" strokeWidth="7" strokeLinecap="round"
+        className="stroke-accent transition-[stroke-dashoffset] duration-500"
+        strokeDasharray={c}
+        strokeDashoffset={c * (1 - Math.max(0, Math.min(100, pct)) / 100)}
+        transform="rotate(-90 36 36)"
+      />
+    </svg>
+  )
+}
+
+/** Vertical 9:16 job frame. Blurred product still + REAL percent while
+ * rendering; player when done; honest error when failed. */
+function JobFrame({ v, stillSrc, onRender }: { v: AfVideo; stillSrc: string | null; onRender: () => void }) {
+  const pct = Math.max(0, Math.min(100, v.progress ?? 0))
+  if (v.has_video) {
+    return (
+      <VideoPlayer
+        src={api.affiliateFileUrl(v.id)}
+        title={`${v.id.slice(0, 12)}${v.duration_s ? ` · ${v.duration_s.toFixed(1)}s` : ''}`}
+        downloadName={`${v.id}.mp4`}
+      />
+    )
+  }
+  return (
+    <div className="relative mx-auto aspect-[9/16] max-h-80 w-full max-w-60 overflow-hidden rounded-xl border border-border bg-panel">
+      {stillSrc ? (
+        <img
+          src={stillSrc}
+          alt=""
+          aria-hidden="true"
+          className="absolute inset-0 h-full w-full scale-110 object-cover opacity-60 blur-md"
+        />
+      ) : null}
+      <div className="absolute inset-0 bg-black/45" />
+      <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 px-4 text-center">
+        {v.status === 'FAILED' ? (
+          <>
+            <p className="text-sm font-semibold text-red-300">Dựng thất bại</p>
+            <Btn variant="accent" size="sm" onClick={onRender}>Dựng lại</Btn>
+          </>
+        ) : (
+          <>
+            <ProgressRing pct={v.status === 'RENDERING' ? pct : 0} />
+            <p className="text-lg font-extrabold tabular-nums text-white">
+              {v.status === 'RENDERING' ? `${pct}%` : 'Chờ dựng'}
+            </p>
+            <p className="text-[11px] text-white/70">
+              {v.status === 'RENDERING' ? 'Đang dựng video thật' : 'Nhấn Dựng video để bắt đầu'}
+            </p>
+          </>
+        )}
+      </div>
+    </div>
+  )
+}
+
+type ChatMsg = { from: 'user' | 'ai'; text: string }
+
+function ReviseChat({ videoId, onRevise }: { videoId: string; onRevise: (id: string, msg: string) => Promise<string> }) {
+  const [msgs, setMsgs] = useState<ChatMsg[]>([])
+  const [draft, setDraft] = useState('')
+  const [busy, setBusy] = useState(false)
+  const send = async () => {
+    const text = draft.trim()
+    if (!text || busy) return
+    setDraft('')
+    setBusy(true)
+    setMsgs((m) => [...m, { from: 'user', text }])
+    try {
+      const reply = await onRevise(videoId, text)
+      setMsgs((m) => [...m, { from: 'ai', text: reply }])
+    } catch (e) {
+      setMsgs((m) => [...m, { from: 'ai', text: `Lỗi: ${(e as Error).message}` }])
+    } finally {
+      setBusy(false)
+    }
+  }
+  return (
+    <div className="rounded-xl border border-border bg-panel p-2.5">
+      <p className="mb-1.5 text-[11px] font-bold uppercase tracking-[0.08em] text-secondary">Yêu cầu AI chỉnh sửa</p>
+      {msgs.length > 0 ? (
+        <ul className="mb-2 max-h-40 space-y-1.5 overflow-y-auto">
+          {msgs.map((m, i) => (
+            <li
+              key={i}
+              className={`max-w-[90%] rounded-lg px-2.5 py-1.5 text-[13px] ${m.from === 'user' ? 'ml-auto bg-accent text-white' : 'bg-raised text-ink'}`}
+            >
+              {m.text}
+            </li>
+          ))}
+        </ul>
+      ) : null}
+      <div className="flex gap-1.5">
+        <Field
+          aria-label="Nhắn yêu cầu chỉnh sửa cho AI"
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          onKeyDown={(e) => { if (e.key === 'Enter') void send() }}
+          placeholder="Ví dụ: làm hook ngắn gọn hơn…"
+          className="flex-1"
+        />
+        <Btn variant="accent" size="sm" busy={busy} disabled={!draft.trim() || busy} onClick={() => void send()} aria-label="Gửi yêu cầu">
+          <Send className="h-4 w-4" aria-hidden="true" />
+        </Btn>
+      </div>
+    </div>
+  )
+}
+
+function VideoJobCard({ v, stillSrc, onRender, onExport, onRevise }: {
+  v: AfVideo
+  stillSrc: string | null
+  onRender: (id: string) => void
+  onExport: (id: string) => void
+  onRevise: (id: string, msg: string) => Promise<string>
+}) {
+  return (
+    <div className="row-item space-y-2.5">
+      <div className="flex items-center justify-between gap-2">
+        <span className="mono">{v.id.slice(0, 12)}</span>
+        <span className="flex items-center gap-2">
+          <StatusBadge value={v.status} />
+          {v.has_video ? (
+            <a
+              href={api.affiliateFileUrl(v.id)}
+              download={`${v.id}.mp4`}
+              className="link-accent text-[13px]"
+            >
+              Tải video
+            </a>
+          ) : v.status !== 'RENDERING' ? (
+            <Btn variant="link" onClick={() => onRender(v.id)}>Dựng video</Btn>
+          ) : null}
+          <a
+            href={api.affiliateVisualUrl(v.id)}
+            download={`${v.id}.png`}
+            className="link-accent text-[13px]"
+          >
+            Tải ảnh
+          </a>
+          <Btn variant="link" onClick={() => onExport(v.id)}>Xuất tệp</Btn>
+        </span>
+      </div>
+      <JobFrame v={v} stillSrc={stillSrc} onRender={() => onRender(v.id)} />
+      <ReviseChat videoId={v.id} onRevise={onRevise} />
+    </div>
+  )
 }
 
 export function AffiliatePage() {
@@ -28,7 +184,12 @@ export function AffiliatePage() {
   const [overScript, setOverScript] = useState<string | null>(null)
 
   const scripts = useQuery({ queryKey: ['afscripts', sel], queryFn: () => api.afScripts(sel), enabled: !!sel })
-  const videos = useQuery({ queryKey: ['afvideos', sel], queryFn: () => api.afVideos(sel), enabled: !!sel })
+  const videos = useQuery({
+    queryKey: ['afvideos', sel],
+    queryFn: () => api.afVideos(sel),
+    enabled: !!sel,
+    refetchInterval: 3000,
+  })
 
   const create = useMutation({
     mutationFn: () => api.afCreateProduct({ name, description: desc, affiliate_url: url }),
@@ -54,6 +215,11 @@ export function AffiliatePage() {
     try { await api.afRenderVideo(videoId); setMsg('') }
     catch (e) { setMsg((e as Error).message) }
     qc.invalidateQueries({ queryKey: ['afvideos', sel] })
+  }
+  const reviseVideo = async (videoId: string, message: string): Promise<string> => {
+    const res = await api.afReviseScript(videoId, message)
+    qc.invalidateQueries({ queryKey: ['afscripts', sel] })
+    return `AI đã viết lại kịch bản mới. Nhấn Dựng video để dựng lại từ bản mới.`
   }
   const doExport = async (videoId: string) => {
     try {
@@ -209,48 +375,14 @@ export function AffiliatePage() {
               ))}
               <h3 className="section-title">Video ({videos.data?.data.length ?? 0})</h3>
               {(videos.data?.data ?? []).map((v) => (
-                <div key={v.id} className="row-item space-y-2">
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="mono">{v.id.slice(0, 12)}</span>
-                    <span className="flex items-center gap-2">
-                      <StatusBadge value={v.status} />
-                      {v.has_video ? (
-                        <a
-                          href={api.affiliateFileUrl(v.id)}
-                          download={`${v.id}.mp4`}
-                          className="link-accent text-[13px]"
-                        >
-                          Tải video
-                        </a>
-                      ) : (
-                        <Btn variant="link" onClick={() => renderVideo(v.id)}>Dựng video</Btn>
-                      )}
-                      <a
-                        href={api.affiliateVisualUrl(v.id)}
-                        download={`${v.id}.png`}
-                        className="link-accent text-[13px]"
-                      >
-                        Tải ảnh
-                      </a>
-                      <Btn variant="link" onClick={() => doExport(v.id)}>Xuất tệp</Btn>
-                    </span>
-                  </div>
-                  {v.has_video ? (
-                    <VideoPlayer
-                      src={api.affiliateFileUrl(v.id)}
-                      title={`${v.id.slice(0, 12)}${v.duration_s ? ` · ${v.duration_s.toFixed(1)}s` : ''}`}
-                      downloadName={`${v.id}.mp4`}
-                    />
-                  ) : (
-                    <img
-                      src={api.affiliateVisualUrl(v.id)}
-                      alt=""
-                      aria-hidden="true"
-                      className="max-h-48 w-full rounded-lg border border-border object-cover"
-                      onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }}
-                    />
-                  )}
-                </div>
+                <VideoJobCard
+                  key={v.id}
+                  v={v}
+                  stillSrc={selected?.image_path ? api.affiliateImageUrl(selected.id) : null}
+                  onRender={renderVideo}
+                  onExport={doExport}
+                  onRevise={reviseVideo}
+                />
               ))}
             </>
           )}

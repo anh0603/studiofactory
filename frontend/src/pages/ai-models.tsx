@@ -61,6 +61,7 @@ export function AiModelsPage() {
   const qc = useQueryClient()
   const providers = useQuery({ queryKey: ['providers'], queryFn: api.providers })
   const models = useQuery({ queryKey: ['models'], queryFn: api.models })
+  const usage = useQuery({ queryKey: ['ai-usage'], queryFn: api.usage })
 
   const [pName, setPName] = useState('')
   const [pUrl, setPUrl] = useState('')
@@ -286,6 +287,8 @@ export function AiModelsPage() {
               {modelList.map((m) => {
                 const t = testResult[m.id]
                 const blocked = blockedReasons(m.cost_class, m.license_status)
+                const use = usage.data?.data.by_model?.find((u) => u.model === m.name)
+                const okRate = use && use.count > 0 ? Math.round(((use.successful ?? 0) / use.count) * 100) : null
                 return (
                   <li key={m.id} className="row-item !p-2.5">
                     <div className="flex items-center justify-between gap-2">
@@ -306,6 +309,11 @@ export function AiModelsPage() {
                     <p className="mt-1 text-xs">
                       <span className="text-muted">Tình trạng: </span>
                       <StatusBadge value={healthVi(m.health_status) === 'Chưa kiểm tra' ? 'UNKNOWN' : m.health_status} label={healthVi(m.health_status)} raw={false} />
+                    </p>
+                    <p className="mono mt-1 text-muted">
+                      {use
+                        ? `Đã dùng ${use.count} · thành công ${okRate ?? 0}% · TB ${use.avg_latency_ms ?? 0}ms${use.last_used_at ? ` · mới nhất ${use.last_used_at.slice(0, 16).replace('T', ' ')}` : ''}`
+                        : 'Chưa phát sinh lượt gọi nào được ghi nhận.'}
                     </p>
                     {blocked.length > 0 ? (
                       <ul className="mt-1 space-y-0.5 text-[12px] text-warn">

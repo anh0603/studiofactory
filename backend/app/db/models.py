@@ -380,6 +380,7 @@ class AffiliateVideo(Base, TimestampMixin):
     visual_artifact_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
     video_path: Mapped[str] = mapped_column(String(1024), default="")
     duration_s: Mapped[float] = mapped_column(Float, default=0.0)
+    progress: Mapped[int] = mapped_column(Integer, default=0)
     export_manifest: Mapped[dict] = mapped_column(JSON, default=dict)
 
 

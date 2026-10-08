@@ -350,6 +350,7 @@ def _video_out(v: M.AffiliateVideo, script: M.AffiliateScript | None = None) -> 
             "status": v.status, "visual_artifact_id": v.visual_artifact_id,
             "video_path": v.video_path or None,
             "has_video": bool(v.video_path), "duration_s": v.duration_s,
+            "progress": v.progress,
             "export_manifest": v.export_manifest,
             "script": _script_out(script) if script else None,
             "created_at": v.created_at, "updated_at": v.updated_at}
@@ -436,6 +437,7 @@ def render_video(video_id: str, body: RenderIn, request: Request,
     if not narration.strip():
         raise AppError("VALIDATION_FAILED", "Script has no speakable text.", 422)
     v.status = "RENDERING"
+    v.progress = 2
     db.commit()
     try:
         ffmpeg_require()
@@ -456,14 +458,31 @@ def render_video(video_id: str, body: RenderIn, request: Request,
         mime, dur = validate_audio(audio_bytes)
         if dur <= 0:
             raise MediaInvalid("tts audio has no duration")
+        v.progress = 30
+        db.commit()
         srt = build_srt([(0.0, dur, narration[:500])])
         rel_sub = f"videos/{v.id}.srt"
         storage.resolve_affiliate(p.id, rel_sub).write_text(srt, encoding="utf-8")
         out_rel = f"videos/{v.id}.mp4"
         out_path = storage.resolve_affiliate(p.id, out_rel)
+
+        def _on_ffmpeg(frac: float, _vid=v.id) -> None:
+            # Real ffmpeg time -> 30..95%. Committed so polling clients see it.
+            pct = 30 + max(0, min(65, int(frac * 65)))
+            try:
+                row = db.get(M.AffiliateVideo, _vid)
+                if row is not None and pct > (row.progress or 0):
+                    row.progress = pct
+                    db.commit()
+            except Exception:  # noqa: BLE001 - progress is best-effort
+                try:
+                    db.rollback()
+                except Exception:  # noqa: BLE001
+                    pass
+
         compose_scene(img_path, _Path(tmp_audio),
                       storage.resolve_affiliate(p.id, rel_sub),
-                      out_path, dur)
+                      out_path, dur, on_progress=_on_ffmpeg)
     except (PipelineError, MediaInvalid) as exc:
         v.status = "FAILED"
         db.commit()
@@ -482,9 +501,60 @@ def render_video(video_id: str, body: RenderIn, request: Request,
             pass
     v.video_path = out_rel
     v.duration_s = dur
+    v.progress = 100
     v.status = "READY"
     db.commit()
     return {"request_id": rid, "data": _video_out(v, script)}
+
+
+class ReviseIn(BaseModel):
+    message: str = Field(min_length=1, max_length=2000)
+    strategy: str = "AUTO"
+
+
+@router.post("/affiliate/videos/{video_id}/revise", status_code=201)
+def revise_script(video_id: str, body: ReviseIn, request: Request,
+                  db: Session = Depends(get_db)) -> dict:
+    """Chat edit: user asks for changes in plain words, AI rewrites the
+    script as a NEW versioned row. Nothing is overwritten."""
+    from ...ai.director import extract_json
+    rid = _rid(request)
+    v = db.get(M.AffiliateVideo, video_id)
+    if v is None:
+        raise AppError("NOT_FOUND", "Video not found.", 404)
+    p = _get_product(db, v.product_id)
+    script = db.get(M.AffiliateScript, v.script_id)
+    if script is None:
+        raise AppError("BAD_REQUEST", "Video has no script to revise.", 400)
+    prompt = (
+        "Rewrite this affiliate video script following the user's request. "
+        "Respond with ONE JSON object only: "
+        '{"hook": "...", "body": "...", "cta": "...", "disclosure": "..."}. '
+        f"Product: {p.name}. Description: {p.description}. "
+        f"Current hook: {script.hook} Current body: {script.body} "
+        f"Current cta: {script.cta} User request: {body.message}")
+    output, provider, model, mock_any, _ = _router_text(
+        db, prompt, rid, body.strategy, None)
+    try:
+        data = extract_json(output)
+        if not isinstance(data, dict) or not data.get("body"):
+            raise ValueError("script shape mismatch")
+    except ValueError as exc:
+        raise AppError("INVALID_RESPONSE", f"revised script malformed ({exc}); nothing saved", 502)
+    disclosure = (data.get("disclosure") or "").strip() or script.disclosure
+    s = M.AffiliateScript(id=f"afs_{uuid.uuid4().hex[:12]}", product_id=p.id,
+                          style=script.style, hook=data.get("hook", ""),
+                          body=data["body"], cta=data.get("cta", ""),
+                          disclosure=disclosure, disclosure_injected=False,
+                          provider=provider, model=model, request_id=rid, mock=mock_any)
+    db.add(s)
+    db.flush()
+    siblings = db.scalars(select(M.AffiliateScript).where(
+        M.AffiliateScript.product_id == p.id,
+        M.AffiliateScript.id != s.id)).all()
+    s.position = max([x.position for x in siblings], default=-1) + 1
+    db.commit()
+    return {"request_id": rid, "data": _script_out(s)}
 
 
 @router.get("/affiliate/products/{product_id}/videos")
