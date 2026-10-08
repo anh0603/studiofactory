@@ -89,9 +89,13 @@ export function AiModelsPage() {
   const usage = useQuery({ queryKey: ['ai-usage'], queryFn: api.usage })
 
   const [showAdd, setShowAdd] = useState(false)
+  const [showCustom, setShowCustom] = useState(false)
   const [pName, setPName] = useState('')
   const [pUrl, setPUrl] = useState('')
   const [pAdapter, setPAdapter] = useState('openai_compatible')
+  const [newKey, setNewKey] = useState('')
+  const [provBusy, setProvBusy] = useState(false)
+  const [provError, setProvError] = useState<unknown>(null)
   const [credFor, setCredFor] = useState('')
   const [credSecret, setCredSecret] = useState('')
   const [credSaved, setCredSaved] = useState('')
@@ -102,6 +106,7 @@ export function AiModelsPage() {
   const [mCost, setMCost] = useState('FREE')
   const [mLic, setMLic] = useState('VERIFIED_COMMERCIAL')
   const [mPriority, setMPriority] = useState('100')
+  const [showModelCustom, setShowModelCustom] = useState(false)
   const [testResult, setTestResult] = useState<Record<string, { state: string; note?: string; error?: string; mock?: boolean }>>({})
 
   const refresh = () => {
@@ -109,16 +114,26 @@ export function AiModelsPage() {
     qc.invalidateQueries({ queryKey: ['models'] })
   }
 
-  const createProv = useMutation({
-    mutationFn: () => api.createProvider({ name: pName.trim(), base_url: pUrl.trim(), adapter_key: pAdapter }),
-    onSuccess: (res) => {
-      setPName(''); setPUrl('')
-      setCredFor(res.data.id)
-      setCredSaved('')
+  const submitProv = async () => {
+    if (!pName.trim() || provBusy) return
+    setProvBusy(true)
+    setProvError(null)
+    try {
+      const res = await api.createProvider({
+        name: pName.trim(), base_url: pUrl.trim(), adapter_key: pAdapter,
+      })
+      const key = newKey.trim()
+      if (key) await api.saveCredential(res.data.id, key)
+      setPName(''); setPUrl(''); setNewKey('')
+      setCredFor(''); setCredSaved('')
       setShowAdd(false)
       refresh()
-    },
-  })
+    } catch (e) {
+      setProvError(e)
+    } finally {
+      setProvBusy(false)
+    }
+  }
   const saveCred = useMutation({
     mutationFn: () => api.saveCredential(credFor, credSecret),
     onSuccess: () => {
@@ -332,42 +347,57 @@ export function AiModelsPage() {
             })}
           </div>
           <p className="mb-2.5 text-[11px] text-muted">{tr('ai.preset.hint')}</p>
-          <div className="space-y-2">
-            <Field
-              aria-label="Tên nhà cung cấp"
-              value={pName}
-              onChange={(e) => setPName(e.target.value)}
-              placeholder="Tên, ví dụ: OpenRouter"
-            />
-            <Select aria-label="Kiểu kết nối" value={pAdapter} onChange={(e) => setPAdapter(e.target.value)}>
-              {ADAPTERS.map((a) => <option key={a.v} value={a.v}>{a.label}</option>)}
-            </Select>
-            <Field
-              aria-label="Địa chỉ cơ sở"
-              value={pUrl}
-              onChange={(e) => setPUrl(e.target.value)}
-              placeholder="https://…/v1 (ví dụ: https://openrouter.ai/api/v1)"
-            />
-            <p className="text-[11px] leading-relaxed text-muted">
-              Địa chỉ phải là https và không phải máy cục bộ. Bỏ trống nếu dịch vụ dùng địa chỉ mặc định.
-            </p>
+          <Field
+            aria-label="Tên nhà cung cấp"
+            value={pName}
+            onChange={(e) => setPName(e.target.value)}
+            placeholder="Tên, ví dụ: OpenRouter"
+          />
+          <div hidden={!showCustom}>
+            <div className="space-y-2">
+              <Select aria-label="Kiểu kết nối" value={pAdapter} onChange={(e) => setPAdapter(e.target.value)}>
+                {ADAPTERS.map((a) => <option key={a.v} value={a.v}>{a.label}</option>)}
+              </Select>
+              <Field
+                aria-label="Địa chỉ cơ sở"
+                value={pUrl}
+                onChange={(e) => setPUrl(e.target.value)}
+                placeholder="https://…/v1 (ví dụ: https://openrouter.ai/api/v1)"
+              />
+              <p className="text-[11px] leading-relaxed text-muted">
+                Địa chỉ phải là https và không phải máy cục bộ. Bỏ trống nếu dịch vụ dùng địa chỉ mặc định.
+              </p>
+            </div>
+          </div>
+          <Field
+            aria-label={tr('ai.key.inline')}
+            type="password"
+            autoComplete="off"
+            value={newKey}
+            onChange={(e) => setNewKey(e.target.value)}
+            placeholder={tr('ai.key.inline.ph')}
+          />
+          <div className="flex items-center justify-between gap-2">
             <Btn
               variant="accent"
-              busy={createProv.isPending}
-              disabled={!pName.trim() || createProv.isPending}
-              onClick={() => createProv.mutate()}
-              className="w-full"
+              busy={provBusy}
+              disabled={!pName.trim() || provBusy}
+              onClick={() => void submitProv()}
+              className="flex-1"
             >
               Thêm nhà cung cấp
             </Btn>
-            {createProv.isError ? (
-              <ExplainError
-                what="Không thêm được nhà cung cấp."
-                error={createProv.error}
-                todo="Kiểm tra địa chỉ phải bắt đầu bằng https và không trỏ về máy cục bộ."
-              />
-            ) : null}
+            <Btn variant="link" onClick={() => setShowCustom((s) => !s)}>
+              {showCustom ? tr('ai.custom.less') : tr('ai.custom.more')}
+            </Btn>
           </div>
+          {provError ? (
+            <ExplainError
+              what="Không thêm được nhà cung cấp."
+              error={provError}
+              todo="Kiểm tra địa chỉ phải bắt đầu bằng https và không trỏ về máy cục bộ."
+            />
+          ) : null}
         </Card>
       ) : null}
 
@@ -443,41 +473,48 @@ export function AiModelsPage() {
             <Field aria-label="Tên mô hình" value={mName} onChange={(e) => setMName(e.target.value)} placeholder="Tên hiển thị" />
             <Field aria-label="Mã mô hình" value={mId} onChange={(e) => setMId(e.target.value)} placeholder="mã gửi tới nhà cung cấp" />
           </div>
-          <div className="grid gap-2 sm:grid-cols-3">
-            <Select aria-label="Năng lực" value={mCap} onChange={(e) => setMCap(e.target.value)}>
-              {Object.entries(CAPS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
-            </Select>
-            <Select aria-label="Lớp chi phí" value={mCost} onChange={(e) => setMCost(e.target.value)}>
-              {COST_CLASSES.map((c) => <option key={c.v} value={c.v}>{c.label}</option>)}
-            </Select>
-            <Select aria-label="Giấy phép" value={mLic} onChange={(e) => setMLic(e.target.value)}>
-              {LICENSES.map((l) => <option key={l.v} value={l.v}>{l.label}</option>)}
-            </Select>
-          </div>
-          <div className="flex items-center gap-2">
-            <Field
-              aria-label="Ưu tiên"
-              type="number"
-              value={mPriority}
-              onChange={(e) => setMPriority(e.target.value)}
-              className="w-28"
-            />
-            <p className="text-[11px] text-muted">Số lớn hơn được chọn trước.</p>
+          <Select aria-label="Năng lực" value={mCap} onChange={(e) => setMCap(e.target.value)}>
+            {Object.entries(CAPS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+          </Select>
+          <div hidden={!showModelCustom}>
+            <div className="grid gap-2 sm:grid-cols-3">
+              <Select aria-label="Lớp chi phí" value={mCost} onChange={(e) => setMCost(e.target.value)}>
+                {COST_CLASSES.map((c) => <option key={c.v} value={c.v}>{c.label}</option>)}
+              </Select>
+              <Select aria-label="Giấy phép" value={mLic} onChange={(e) => setMLic(e.target.value)}>
+                {LICENSES.map((l) => <option key={l.v} value={l.v}>{l.label}</option>)}
+              </Select>
+              <div className="flex items-center gap-2">
+                <Field
+                  aria-label="Ưu tiên"
+                  type="number"
+                  value={mPriority}
+                  onChange={(e) => setMPriority(e.target.value)}
+                  className="w-28"
+                />
+                <p className="text-[11px] text-muted">Số lớn hơn được chọn trước.</p>
+              </div>
+            </div>
           </div>
           {warnings.length > 0 ? (
             <ul className="space-y-0.5 rounded-lg border border-emberline bg-tint p-2.5 text-[12px] text-warn">
               {warnings.map((w) => <li key={w}>{w}</li>)}
             </ul>
           ) : null}
-          <Btn
-            variant="accent"
-            busy={createModel.isPending}
-            disabled={!mProvider || !mName.trim() || createModel.isPending}
-            onClick={() => createModel.mutate()}
-            className="w-full"
-          >
-            Thêm mô hình
-          </Btn>
+          <div className="flex items-center gap-2">
+            <Btn
+              variant="accent"
+              busy={createModel.isPending}
+              disabled={!mProvider || !mName.trim() || createModel.isPending}
+              onClick={() => createModel.mutate()}
+              className="flex-1"
+            >
+              Thêm mô hình
+            </Btn>
+            <Btn variant="link" onClick={() => setShowModelCustom((s) => !s)}>
+              {showModelCustom ? tr('ai.custom.less') : tr('ai.custom.more')}
+            </Btn>
+          </div>
           {createModel.isError ? (
             <ExplainError
               what="Không thêm được mô hình."
