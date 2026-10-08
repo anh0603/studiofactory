@@ -123,8 +123,52 @@ def patch_project(project_id: str, body: ProjectPatch, request: Request,
 
 @router.delete("/projects/{project_id}")
 def delete_project(project_id: str, request: Request, db: Session = Depends(get_db)) -> dict:
+    import shutil as _shutil
     p = _get_story_project(db, project_id)
-    # Delete children (scenes, characters+refs, director plans) — no media jobs exist in Phase 3.
+    # Refuse while work is in flight: cancel/pause jobs and stop runs first.
+    live_jobs = db.scalars(select(M.Job).where(
+        M.Job.project_id == p.id,
+        M.Job.status.in_(("QUEUED", "RUNNING", "PAUSED")))).all()
+    if live_jobs:
+        raise AppError("CONFLICT",
+                       "Project has active jobs; pause or cancel them first.", 409)
+    live_runs = db.scalars(select(M.AutopilotRun).where(
+        M.AutopilotRun.project_id == p.id,
+        M.AutopilotRun.status.in_(("RUNNING", "PAUSED", "AWAITING_APPROVAL")))).all()
+    if live_runs:
+        raise AppError("CONFLICT",
+                       "Project has an active autopilot run; stop it first.", 409)
+    job_ids = [j.id for j in db.scalars(select(M.Job).where(
+        M.Job.project_id == p.id)).all()]
+    for jid in job_ids:
+        for a in db.scalars(select(M.Artifact).where(M.Artifact.job_id == jid)).all():
+            db.delete(a)
+        for e in db.scalars(select(M.JobEvent).where(M.JobEvent.job_id == jid)).all():
+            db.delete(e)
+        for n in db.scalars(select(M.WorkflowNode).where(M.WorkflowNode.job_id == jid)).all():
+            db.delete(n)
+        for q in db.scalars(select(M.QCResult).where(M.QCResult.job_id == jid)).all():
+            db.delete(q)
+        for x in db.scalars(select(M.Export).where(M.Export.job_id == jid)).all():
+            db.delete(x)
+        job = db.get(M.Job, jid)
+        if job is not None:
+            db.delete(job)
+    for pub in db.scalars(select(M.PublishJob).where(
+            M.PublishJob.project_id == p.id)).all():
+        for a in db.scalars(select(M.PublishAttempt).where(
+                M.PublishAttempt.publish_job_id == pub.id)).all():
+            db.delete(a)
+        db.delete(pub)
+    for s in db.scalars(select(M.Schedule).where(
+            M.Schedule.project_id == p.id)).all():
+        db.delete(s)
+    for r in db.scalars(select(M.AutopilotRun).where(
+            M.AutopilotRun.project_id == p.id)).all():
+        db.delete(r)
+    for c in db.scalars(select(M.AutopilotConfig).where(
+            M.AutopilotConfig.project_id == p.id)).all():
+        db.delete(c)
     for sc in db.scalars(select(M.Scene).where(M.Scene.project_id == p.id)).all():
         db.delete(sc)
     for ch in db.scalars(select(M.Character).where(M.Character.project_id == p.id)).all():
@@ -137,6 +181,12 @@ def delete_project(project_id: str, request: Request, db: Session = Depends(get_
         db.delete(plan)
     db.delete(p)
     db.commit()
+    # Remove files on disk (best-effort; DB is source of truth).
+    try:
+        _shutil.rmtree(LocalStorage(settings.projects_root).project_dir(p.id),
+                       ignore_errors=True)
+    except Exception:  # noqa: BLE001
+        pass
     return {"request_id": _rid(request), "data": {"deleted": project_id}}
 
 

@@ -118,6 +118,42 @@ def test_project_crud_validation_factory_isolation(client):
     assert client.get(f"/api/v1/projects/{prj['id']}").status_code == 404
 
 
+def test_project_delete_cascades_children_and_disk(tmp_path, monkeypatch, client):
+    import app.api.v1.story as story_mod
+    prj = mk_project(client)
+    pid = prj["id"]
+    client.post(f"/api/v1/projects/{pid}/scenes",
+                json={"order": 1, "description": "s", "status": "DRAFT"})
+    client.post(f"/api/v1/projects/{pid}/characters", json={"name": "Milo"})
+    from pathlib import Path
+    root = Path(story_mod.settings.projects_root) / pid
+    assert root.is_dir()
+    assert client.delete(f"/api/v1/projects/{pid}").status_code == 200
+    assert client.get(f"/api/v1/projects/{pid}").status_code == 404
+    assert client.get(f"/api/v1/projects/{pid}/scenes").status_code == 404
+    assert client.get(f"/api/v1/projects/{pid}/characters").status_code == 404
+    assert not root.exists()
+    assert client.delete(f"/api/v1/projects/{pid}").status_code == 404
+
+
+def test_project_delete_blocked_with_live_job(tmp_path, monkeypatch, client):
+    mk_ai(client)
+    prj = mk_project(client)
+    pid = prj["id"]
+    queue_plan()
+    plan = client.post(f"/api/v1/projects/{pid}/director", json={
+        "idea": "x", "audience": "kids", "tone": "warm",
+        "duration": 30.0, "language": "vi", "style": "3D"}).json()["data"]
+    client.post(f"/api/v1/director/{plan['id']}/approve")
+    client.post(f"/api/v1/projects/{pid}/scenes", json={"order": 1, "description": "s"})
+    job = client.post("/api/v1/jobs", json={"project_id": pid, "kind": "FULL_PIPELINE",
+                                            "idempotency_key": "del-guard-1"}).json()["data"]
+    assert client.delete(f"/api/v1/projects/{pid}").status_code == 409
+    assert client.post(f"/api/v1/jobs/{job['id']}/cancel").status_code == 200
+    assert client.delete(f"/api/v1/projects/{pid}").status_code == 200
+    assert client.get(f"/api/v1/projects/{pid}").status_code == 404
+
+
 # ---------------------------------------------------------------- characters
 
 def test_character_crud_lock_honesty(client):

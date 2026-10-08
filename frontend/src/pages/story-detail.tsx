@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Bot, Info, Users } from 'lucide-react'
 import { useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { Link, useNavigate, useParams } from 'react-router-dom'
 import { api } from '../api/client'
 import type { DirectorPlan } from '../api/client'
 import { ErrorState, LoadingList } from '../components/states'
@@ -15,6 +15,7 @@ import { Workspace } from '../story/workspaces'
 
 export function StoryDetailPage() {
   const { projectId } = useParams()
+  const navigate = useNavigate()
   const qcClient = useQueryClient()
   const [activeStep, setActiveStep] = useState<StepId>('DIRECTOR')
   const [busyStep, setBusyStep] = useState<StepId | null>(null)
@@ -148,7 +149,21 @@ export function StoryDetailPage() {
       <PageHeader
         title={p.name}
         sub={`${p.audience || 'chưa rõ'} · ${p.duration_target} giây · ${p.language}`}
-        actions={<StatusBadge value={p.status} raw={false} />}
+        actions={
+          <>
+            <StatusBadge value={p.status} raw={false} />
+            <Btn
+              variant="link"
+              onClick={() => {
+                if (window.confirm(`Xoá "${p.name}"? Toàn bộ cảnh, file và lịch sử sẽ bị xóa, không khôi phục được.`)) {
+                  api.deleteProject(p.id).then(() => navigate('/story'))
+                }
+              }}
+            >
+              Xoá dự án
+            </Btn>
+          </>
+        }
       />
 
       <div className="hidden md:block">

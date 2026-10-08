@@ -132,11 +132,12 @@ function ReviseChat({ videoId, onRevise }: { videoId: string; onRevise: (id: str
   )
 }
 
-function VideoJobCard({ v, stillSrc, onRender, onExport, onRevise }: {
+function VideoJobCard({ v, stillSrc, onRender, onExport, onDelete, onRevise }: {
   v: AfVideo
   stillSrc: string | null
   onRender: (id: string) => void
   onExport: (id: string) => void
+  onDelete: (id: string) => void
   onRevise: (id: string, msg: string) => Promise<string>
 }) {
   return (
@@ -163,7 +164,8 @@ function VideoJobCard({ v, stillSrc, onRender, onExport, onRevise }: {
           >
             Tải ảnh
           </a>
-          <Btn variant="link" onClick={() => onExport(v.id)}>Xuất tệp</Btn>
+                      <Btn variant="link" onClick={() => onExport(v.id)}>Xuất tệp</Btn>
+                      <Btn variant="link" onClick={() => onDelete(v.id)}>Xoá</Btn>
         </span>
       </div>
       <JobFrame v={v} stillSrc={stillSrc} onRender={() => onRender(v.id)} />
@@ -278,6 +280,29 @@ export function AffiliatePage() {
       setMsg(`Đã xuất tệp: ${res.data.manifest.file}`)
     } catch (e) { setMsg((e as Error).message) }
     qc.invalidateQueries({ queryKey: ['afvideos', sel] })
+  }
+  const delProduct = async () => {
+    if (!selected) return
+    if (!window.confirm(`Xoá sản phẩm "${selected.name}"? Toàn bộ kịch bản, video và file sẽ bị xóa.`)) return
+    try {
+      await api.afDeleteProduct(selected.id)
+      setSel('')
+      setHookId(null)
+      setMsg('')
+    } catch (e) { setMsg((e as Error).message) }
+    qc.invalidateQueries({ queryKey: ['afproducts'] })
+  }
+  const delVideo = async (videoId: string) => {
+    if (!window.confirm('Xoá video này? File video và dữ liệu sẽ bị xóa.')) return
+    try { await api.afDeleteVideo(videoId); setMsg('') }
+    catch (e) { setMsg((e as Error).message) }
+    qc.invalidateQueries({ queryKey: ['afvideos', sel] })
+  }
+  const delScript = async (scriptId: string) => {
+    if (!window.confirm('Xoá kịch bản này?')) return
+    try { await api.afDeleteScript(scriptId); setMsg('') }
+    catch (e) { setMsg((e as Error).message) }
+    qc.invalidateQueries({ queryKey: ['afscripts', sel] })
   }
   const setTone = async (productId: string, tone: string) => {
     try { await api.afPatchProduct(productId, { tone }); setMsg('') }
@@ -484,6 +509,7 @@ export function AffiliatePage() {
               <Card>
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <h2 className="section-title">1 · Tạo kịch bản cho {selected?.name}</h2>
+                  <Btn variant="link" onClick={() => void delProduct()}>Xoá sản phẩm</Btn>
                 </div>
                 <div className="mt-2.5 flex flex-col gap-2 sm:flex-row">
                   <Select aria-label="Kiểu kịch bản" value={style} onChange={(e) => setStyle(e.target.value)} className="sm:max-w-52">
@@ -572,6 +598,7 @@ export function AffiliatePage() {
                     <p className="mt-1 text-sm text-secondary">{s.body}</p>
                     <p className="mt-1 text-sm text-ember">{s.cta}</p>
                     <p className="mt-1.5 rounded-lg bg-panel px-2.5 py-2 text-xs text-secondary">{s.disclosure}</p>
+                    <Btn variant="link" onClick={() => delScript(s.id)} className="mt-1.5">Xoá kịch bản</Btn>
                   </div>
                 </Card>
               ))}
@@ -583,6 +610,7 @@ export function AffiliatePage() {
                   stillSrc={selected?.image_path ? api.affiliateImageUrl(selected.id) : null}
                   onRender={renderVideo}
                   onExport={doExport}
+                  onDelete={delVideo}
                   onRevise={reviseVideo}
                 />
               ))}

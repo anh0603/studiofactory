@@ -233,3 +233,23 @@ def test_affiliate_render_success(tmp_path, monkeypatch):
     assert vid.status_code == 200
     assert vid.headers["content-type"] == "video/mp4"
     assert vid.content[4:8] == b"ftyp"
+
+def test_affiliate_delete_guards_and_cascade(tmp_path, monkeypatch):
+    client, _ = make_client(tmp_path, monkeypatch)
+    assert client.delete("/api/v1/affiliate/videos/afv_nope").status_code == 404
+    assert client.delete("/api/v1/affiliate/scripts/afs_nope").status_code == 404
+    assert client.delete("/api/v1/affiliate/products/afp_nope").status_code == 404
+    setup_ai(client, caps=("TEXT",))
+    p = client.post("/api/v1/affiliate/products", json={"name": "Earbuds"}).json()["data"]
+    v = _aff_video(client, p["id"], with_image=False)
+    scripts = client.get(f"/api/v1/affiliate/products/{p['id']}/scripts").json()["data"]
+    assert len(scripts) == 1
+    # Script used by a video cannot go first.
+    assert client.delete(f"/api/v1/affiliate/scripts/{scripts[0]['id']}").status_code == 409
+    # Delete the video, then the script, then the product with everything.
+    assert client.delete(f"/api/v1/affiliate/videos/{v['id']}").status_code == 200
+    assert client.delete(f"/api/v1/affiliate/scripts/{scripts[0]['id']}").status_code == 200
+    assert client.get(f"/api/v1/affiliate/products/{p['id']}/scripts").json()["data"] == []
+    assert client.delete(f"/api/v1/affiliate/products/{p['id']}").status_code == 200
+    assert client.get(f"/api/v1/affiliate/products/{p['id']}").status_code == 404
+    assert client.get("/api/v1/affiliate/products").json()["data"] == []

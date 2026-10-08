@@ -89,6 +89,8 @@ export const api = {
       method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
     }),
   project: (id: string) => request<{ request_id: string; data: Project }>(`/api/v1/projects/${id}`),
+  deleteProject: (id: string) =>
+    request<{ request_id: string; data: { deleted: string } }>(`/api/v1/projects/${id}`, { method: 'DELETE' }),
   characters: (projectId: string) =>
     request<{ request_id: string; data: Character[] }>(`/api/v1/projects/${projectId}/characters`),
   createCharacter: (projectId: string, body: Record<string, unknown>) =>
@@ -251,6 +253,18 @@ export const api = {
     request<{ request_id: string; data: AfProduct }>('/api/v1/affiliate/products', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
+    }),
+  afDeleteProduct: (id: string) =>
+    request<{ request_id: string; data: { deleted: string } }>(`/api/v1/affiliate/products/${id}`, {
+      method: 'DELETE',
+    }),
+  afDeleteVideo: (videoId: string) =>
+    request<{ request_id: string; data: { deleted: string } }>(`/api/v1/affiliate/videos/${videoId}`, {
+      method: 'DELETE',
+    }),
+  afDeleteScript: (scriptId: string) =>
+    request<{ request_id: string; data: { deleted: string } }>(`/api/v1/affiliate/scripts/${scriptId}`, {
+      method: 'DELETE',
     }),
   afPatchProduct: (id: string, body: Record<string, unknown>) =>
     request<{ request_id: string; data: AfProduct }>(`/api/v1/affiliate/products/${id}`, {

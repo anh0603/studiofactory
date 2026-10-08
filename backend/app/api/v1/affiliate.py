@@ -138,7 +138,14 @@ def patch_product(product_id: str, body: ProductPatch, request: Request,
 @router.delete("/affiliate/products/{product_id}")
 def delete_product(product_id: str, request: Request,
                    db: Session = Depends(get_db)) -> dict:
+    import shutil as _shutil
     p = _get_product(db, product_id)
+    rendering = db.scalars(select(M.AffiliateVideo).where(
+        M.AffiliateVideo.product_id == p.id,
+        M.AffiliateVideo.status == "RENDERING")).all()
+    if rendering:
+        raise AppError("CONFLICT",
+                       "A video is rendering; wait for it to finish first.", 409)
     for v in db.scalars(select(M.AffiliateVideo).where(
             M.AffiliateVideo.product_id == p.id)).all():
         db.delete(v)
@@ -147,7 +154,49 @@ def delete_product(product_id: str, request: Request,
         db.delete(s)
     db.delete(p)
     db.commit()
+    try:
+        _shutil.rmtree(_storage().affiliate_dir(p.id), ignore_errors=True)
+    except Exception:  # noqa: BLE001
+        pass
     return {"request_id": _rid(request), "data": {"deleted": product_id}}
+
+
+@router.delete("/affiliate/videos/{video_id}", status_code=200)
+def delete_video(video_id: str, request: Request,
+                 db: Session = Depends(get_db)) -> dict:
+    v = db.get(M.AffiliateVideo, video_id)
+    if v is None:
+        raise AppError("NOT_FOUND", "Video not found.", 404)
+    if v.status == "RENDERING":
+        raise AppError("CONFLICT",
+                       "Video is rendering; wait for it to finish first.", 409)
+    storage = _storage()
+    for rel in (v.video_path, f"videos/{v.id}.srt"):
+        if not rel:
+            continue
+        try:
+            storage.resolve_affiliate(v.product_id, rel).unlink(missing_ok=True)
+        except Exception:  # noqa: BLE001 - file may already be gone
+            pass
+    db.delete(v)
+    db.commit()
+    return {"request_id": _rid(request), "data": {"deleted": video_id}}
+
+
+@router.delete("/affiliate/scripts/{script_id}", status_code=200)
+def delete_script(script_id: str, request: Request,
+                  db: Session = Depends(get_db)) -> dict:
+    s = db.get(M.AffiliateScript, script_id)
+    if s is None:
+        raise AppError("NOT_FOUND", "Script not found.", 404)
+    used = db.scalar(select(M.AffiliateVideo).where(
+        M.AffiliateVideo.script_id == s.id).limit(1))
+    if used is not None:
+        raise AppError("CONFLICT",
+                       "Script is used by a video; delete the video first.", 409)
+    db.delete(s)
+    db.commit()
+    return {"request_id": _rid(request), "data": {"deleted": script_id}}
 
 
 @router.post("/affiliate/products/{product_id}/image", status_code=201)

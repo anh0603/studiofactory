@@ -109,8 +109,8 @@ export function StoryProjectsPage() {
       {empty ? null : (
         <ul className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
           {projects.data.data.map((p) => (
-            <li key={p.id}>
-              <Link to={`/story/${p.id}`} className="row-item row-item-hover group block !p-4">
+            <li key={p.id} className="row-item row-item-hover group !p-4">
+              <Link to={`/story/${p.id}`} className="block">
                 <div className="flex items-start gap-3">
                   <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-border bg-panel text-secondary transition-colors duration-hover group-hover:border-ink/30 group-hover:text-accent" aria-hidden="true">
                     <Clapperboard className="h-[18px] w-[18px]" />
@@ -121,9 +121,23 @@ export function StoryProjectsPage() {
                       <StatusBadge value={p.status} raw={false} className="shrink-0" />
                     </div>
                     {p.description ? <p className="mt-1 line-clamp-2 text-[13px] text-secondary">{p.description}</p> : null}
-                    <p className="mt-2 text-[12px] text-muted">
-                      {p.audience || 'chưa rõ khán giả'} · {p.duration_target}s
-                    </p>
+                    <div className="mt-2 flex items-center justify-between gap-2">
+                      <p className="text-[12px] text-muted">
+                        {p.audience || 'chưa rõ khán giả'} · {p.duration_target}s
+                      </p>
+                      <Btn
+                        variant="link"
+                        onClick={(e) => {
+                          e.preventDefault()
+                          e.stopPropagation()
+                          if (window.confirm(`Xoá "${p.name}"? Toàn bộ cảnh, file và lịch sử sẽ bị xóa, không khôi phục được.`)) {
+                            api.deleteProject(p.id).then(() => qc.invalidateQueries({ queryKey: ['projects'] }))
+                          }
+                        }}
+                      >
+                        Xoá
+                      </Btn>
+                    </div>
                   </div>
                 </div>
               </Link>
