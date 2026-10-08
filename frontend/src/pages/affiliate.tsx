@@ -285,9 +285,20 @@ export function AffiliatePage() {
     qc.invalidateQueries({ queryKey: ['afproducts'] })
   }
 
+  const MAX_IMG = 10 * 1024 * 1024
+  const IMG_OK = ['image/jpeg', 'image/png', 'image/webp']
+
+  const checkImageFile = (file: File | undefined): string | null => {
+    if (!file) return 'yes'
+    if (!IMG_OK.includes(file.type)) return 'Chỉ nhận ảnh JPG, PNG hoặc WEBP. Ảnh iPhone (HEIC) cần chuyển đổi trước.'
+    if (file.size > MAX_IMG) return 'Ảnh quá lớn (tối đa 10MB). Hãy nén ảnh rồi thử lại.'
+    return null
+  }
+
   const dropImage = async (productId: string, file: File | undefined) => {
     if (!file) return
-    if (!file.type.startsWith('image/')) { setMsg('Tệp thả vào phải là hình ảnh.'); return }
+    const problem = checkImageFile(file)
+    if (problem) { setMsg(problem); return }
     try {
       await api.afUploadImage(productId, file)
       setMsg('')
@@ -298,7 +309,8 @@ export function AffiliatePage() {
   const pickImage = async (productId: string, file: File | undefined) => {
     if (!file) return
     setUpErr('')
-    if (!file.type.startsWith('image/')) { setUpErr('Chỉ nhận tệp hình ảnh (PNG/JPG).'); return }
+    const problem = checkImageFile(file)
+    if (problem) { setUpErr(problem); return }
     setUpBusy(true)
     try {
       await api.afUploadImage(productId, file)
@@ -417,7 +429,7 @@ export function AffiliatePage() {
                 <input
                   ref={fileRef}
                   type="file"
-                  accept="image/*"
+                  accept=".jpg,.jpeg,.png,.webp"
                   aria-label="Chọn ảnh sản phẩm từ máy"
                   className="hidden"
                   onChange={(e) => {
