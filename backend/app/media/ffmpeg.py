@@ -173,7 +173,7 @@ def concat(parts: list[Path], out: Path, timeout_s: float = 120.0) -> None:
         list_file = f.name
     try:
         code, err = run(["-f", "concat", "-safe", "0", "-i", list_file,
-                         "-c", "copy", str(out)], timeout_s)
+                         "-c", "copy", "-movflags", "+faststart", str(out)], timeout_s)
         if code != 0 or not out.exists() or out.stat().st_size == 0:
             raise RuntimeError(f"ffmpeg concat failed rc={code}: {err[-500:]}")
     finally:
