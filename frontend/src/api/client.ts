@@ -472,7 +472,8 @@ export interface AnalyticsOverview {
     fallbacks: number
     avg_latency_ms: number
     by_model: { model: string; count: number }[]
-    by_error: { code: string; count: number }[]
+    by_error: { code: string; count: number; blocked?: number }[]
+    blocked_pre_network?: number
     cost: number | null
     cost_state: string
   }

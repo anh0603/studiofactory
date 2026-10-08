@@ -75,7 +75,7 @@ def test_aggregations_match_stored_rows(tmp_path):
     assert data["production"]["qc_blocked"] == 1
     assert data["production"]["videos"] == 1
     assert data["ai"]["requests"] == 2 and data["ai"]["fallbacks"] == 1
-    assert data["ai"]["by_error"] == [{"code": "TIMEOUT", "count": 1}]
+    assert data["ai"]["by_error"] == [{"code": "TIMEOUT", "count": 1, "blocked": 0}]
     assert data["publishing"]["confirmed"] == 1
     assert data["publishing"]["by_platform"] == [{"platform": "youtube", "count": 1}]
     assert data["affiliate"]["products"] == 1

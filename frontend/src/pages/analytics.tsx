@@ -63,8 +63,16 @@ export function AnalyticsPage() {
         </Section>
         <Section title="AI">
           <p>Yêu cầu {num(d.ai.requests)} · Thành công {num(d.ai.successful)} · Dự phòng {num(d.ai.fallbacks)} · Trung bình {num(d.ai.avg_latency_ms)}ms</p>
+          {(d.ai.blocked_pre_network ?? 0) > 0 ? (
+            <p className="text-warn">Chưa gọi nhà cung cấp {num(d.ai.blocked_pre_network)} (bị chặn trước vì hết quota/circuit, không tốn tiền)</p>
+          ) : null}
           <Bars rows={d.ai.by_model.slice(0, 5).map((m) => ({ label: m.model, value: num(m.count), tone: 'bg-accent' }))} />
-          {d.ai.by_error.map((e) => <p key={e.code} className="text-ember">Lỗi {e.code}: {num(e.count)}</p>)}
+          {d.ai.by_error.map((e) => (
+            <p key={e.code} className="text-ember">
+              Lỗi {e.code}: {num(e.count)}
+              {(e.blocked ?? 0) > 0 ? ` (trong đó ${num(e.blocked)} chưa gọi mạng)` : ''}
+            </p>
+          ))}
         </Section>
         <Section title="Tự động hoá">
           <p>Lượt chạy {num(d.automation.runs)} · Đã lên lịch {num(d.automation.scheduled)}</p>

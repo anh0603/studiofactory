@@ -87,11 +87,20 @@ def overview(request: Request, from_: str | None = Query(default=None, alias="fr
     ai_fallbacks = sum(1 for e in ai_rows if e.fallback_reason)
     lat = [e.latency_ms for e in ai_rows if e.latency_ms]
     by_model: dict[str, int] = {}
-    by_error: dict[str, int] = {}
+    by_error: dict[str, dict] = {}
+    blocked_pre_network = 0
     for e in ai_rows:
-        by_model[e.model or "?"] = by_model.get(e.model or "?", 0) + 1
+        # Empty-model rows are pre-network refusals, not a model named "" —
+        # they belong in the blocked count, never in a "?" chart row.
+        if e.status == "BLOCKED":
+            blocked_pre_network += 1
+        if e.model:
+            by_model[e.model] = by_model.get(e.model, 0) + 1
         if e.error_category:
-            by_error[e.error_category] = by_error.get(e.error_category, 0) + 1
+            d = by_error.setdefault(e.error_category, {"count": 0, "blocked": 0})
+            d["count"] += 1
+            if e.status == "BLOCKED":
+                d["blocked"] += 1
 
     pub_by_platform = dict(db.execute(select(
         M.PublishAttempt.platform, func.count()).where(
@@ -110,8 +119,10 @@ def overview(request: Request, from_: str | None = Query(default=None, alias="fr
         "ai": {"requests": len(ai_rows), "successful": ai_success,
                "failed": len(ai_rows) - ai_success, "fallbacks": ai_fallbacks,
                "avg_latency_ms": round(sum(lat) / len(lat), 1) if lat else 0,
+               "blocked_pre_network": blocked_pre_network,
                "by_model": [{"model": k, "count": v} for k, v in by_model.items()],
-               "by_error": [{"code": k, "count": v} for k, v in by_error.items()],
+               "by_error": [{"code": k, "count": v["count"], "blocked": v["blocked"]}
+                            for k, v in by_error.items()],
                "cost": None, "cost_state": "UNKNOWN"},
         "automation": {"runs": runs, "scheduled": sched_scheduled,
                        "dispatched": sched_dispatched, "missed": sched_missed},
